@@ -113,6 +113,22 @@ func (s3c *s3Cacher) Put(ctx context.Context, name string, content io.ReadSeeker
 	return err
 }
 
+func (s3c *s3Cacher) Walk(ctx context.Context, fn func(name string) (bool, error)) error {
+	objects := s3c.client.ListObjects(ctx, s3c.bucket, minio.ListObjectsOptions{
+		Recursive: true,
+	})
+	for info := range objects {
+		if info.Err != nil {
+			return info.Err
+		}
+		loop, err := fn(info.Key)
+		if err != nil || !loop {
+			return err
+		}
+	}
+	return nil
+}
+
 // s3Cache is the cache returned by [s3Cacher.Get].
 type s3Cache struct {
 	*minio.Object

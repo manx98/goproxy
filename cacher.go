@@ -31,6 +31,8 @@ type Cacher interface {
 
 	// Put puts a cache for the name with the content.
 	Put(ctx context.Context, name string, content io.ReadSeeker) error
+
+	Walk(ctx context.Context, fn func(name string) (bool, error)) error
 }
 
 // DirCacher implements [Cacher] using a directory on the local disk. If the
@@ -78,4 +80,24 @@ func (dc DirCacher) Put(ctx context.Context, name string, content io.ReadSeeker)
 		return err
 	}
 	return os.Rename(f.Name(), file)
+}
+
+func (dc DirCacher) Walk(ctx context.Context, fn func(name string) (bool, error)) error {
+	return filepath.Walk(string(dc), func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+		if path == string(dc) {
+			return nil
+		}
+		if ok, err := fn(filepath.ToSlash(path[len(string(dc))+1:])); err != nil {
+			return err
+		} else if !ok {
+			return filepath.SkipAll
+		}
+		return context.Cause(ctx)
+	})
 }

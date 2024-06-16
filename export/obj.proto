@@ -1,0 +1,14 @@
+syntax = "proto3";
+option go_package = "./export";
+
+message DirEntry {
+  string id=1;
+  repeated FileEntry entries = 2;
+}
+
+message FileEntry {
+  string id=1;
+  string name=2;
+  bool is_dir=3;
+  int64 mtime=4;
+}
