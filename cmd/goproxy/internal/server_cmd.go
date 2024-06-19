@@ -57,6 +57,7 @@ type serverCmdConfig struct {
 	connectTimeout   time.Duration
 	fetchTimeout     time.Duration
 	shutdownTimeout  time.Duration
+	noFetch          bool
 }
 
 // newServerCmdConfig creates a new [serverCmdConfig].
@@ -82,6 +83,7 @@ func newServerCmdConfig(cmd *cobra.Command) *serverCmdConfig {
 	fs.Int64Var(&cfg.s3CacherOpts.partSize, "cacher-s3-part-size", 100<<20, "multipart upload part size for the S3 cacher")
 	fs.StringVar(&cfg.tempDir, "temp-dir", os.TempDir(), "directory for storing temporary files")
 	fs.BoolVar(&cfg.insecure, "insecure", false, "allow insecure TLS connections")
+	fs.BoolVar(&cfg.noFetch, "no-fetch", false, "only use local cache.")
 	fs.DurationVar(&cfg.connectTimeout, "connect-timeout", 30*time.Second, "maximum amount of time (0 means no limit) will wait for an outgoing connection to establish")
 	fs.DurationVar(&cfg.fetchTimeout, "fetch-timeout", 10*time.Minute, "maximum amount of time (0 means no limit) will wait for a fetch to complete")
 	fs.DurationVar(&cfg.shutdownTimeout, "shutdown-timeout", 10*time.Second, "maximum amount of time (0 means no limit) will wait for the server to shutdown")
@@ -104,6 +106,7 @@ func runServerCmd(cmd *cobra.Command, args []string, cfg *serverCmdConfig) error
 		ProxiedSumDBs: cfg.proxiedSumDBs,
 		TempDir:       cfg.tempDir,
 		Transport:     transport,
+		NoFetch:       cfg.noFetch,
 	}
 	switch cfg.cacher {
 	case "dir":

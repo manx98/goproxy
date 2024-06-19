@@ -7,14 +7,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/goproxy/goproxy/logger"
+	"go.uber.org/zap"
 	"io"
 	"io/fs"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"path"
-	"strconv"
 	"strings"
 	"sync"
 
@@ -67,10 +67,7 @@ type Goproxy struct {
 	// If Transport is nil, [http.DefaultTransport] is used.
 	Transport http.RoundTripper
 
-	// ErrorLogger is used to log errors that occur during proxying.
-	//
-	// If ErrorLogger is nil, [log.Default] is used.
-	ErrorLogger *log.Logger
+	NoFetch bool
 
 	initOnce      sync.Once
 	fetcher       Fetcher
@@ -109,7 +106,7 @@ func (g *Goproxy) init() {
 // ServeHTTP implements [http.Handler].
 func (g *Goproxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	g.initOnce.Do(g.init)
-
+	logger.Debug("accept request", zap.String("url", req.URL.String()))
 	switch req.Method {
 	case http.MethodGet, http.MethodHead:
 	default:
@@ -117,12 +114,12 @@ func (g *Goproxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	path := cleanPath(req.URL.Path)
-	if path != req.URL.Path || path[len(path)-1] == '/' {
+	urlPath := cleanPath(req.URL.Path)
+	if urlPath != req.URL.Path || urlPath[len(urlPath)-1] == '/' {
 		responseNotFound(rw, req, 86400)
 		return
 	}
-	target := path[1:] // Remove the leading slash.
+	target := urlPath[1:] // Remove the leading slash.
 
 	if strings.HasPrefix(target, "sumdb/") {
 		g.serveSumDB(rw, req, target)
@@ -133,8 +130,6 @@ func (g *Goproxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 // serveFetch serves fetch requests.
 func (g *Goproxy) serveFetch(rw http.ResponseWriter, req *http.Request, target string) {
-	noFetch, _ := strconv.ParseBool(req.Header.Get("Disable-Module-Fetch"))
-
 	escapedModulePath, after, ok := strings.Cut(target, "/@")
 	if !ok {
 		responseNotFound(rw, req, 86400, "missing /@v/")
@@ -147,10 +142,10 @@ func (g *Goproxy) serveFetch(rw http.ResponseWriter, req *http.Request, target s
 	}
 	switch after {
 	case "latest":
-		g.serveFetchQuery(rw, req, target, modulePath, after, noFetch)
+		g.serveFetchQuery(rw, req, target, modulePath, after)
 		return
 	case "v/list":
-		g.serveFetchList(rw, req, target, modulePath, noFetch)
+		g.serveFetchList(rw, req, target, modulePath)
 		return
 	}
 
@@ -182,28 +177,28 @@ func (g *Goproxy) serveFetch(rw http.ResponseWriter, req *http.Request, target s
 		return
 	}
 	if checkCanonicalVersion(modulePath, moduleVersion) == nil {
-		g.serveFetchDownload(rw, req, target, modulePath, moduleVersion, noFetch)
+		g.serveFetchDownload(rw, req, target, modulePath, moduleVersion)
 	} else if ext == ".info" {
-		g.serveFetchQuery(rw, req, target, modulePath, moduleVersion, noFetch)
+		g.serveFetchQuery(rw, req, target, modulePath, moduleVersion)
 	} else {
 		responseNotFound(rw, req, 86400, "unrecognized version")
 	}
 }
 
 // serveFetchQuery serves fetch query requests.
-func (g *Goproxy) serveFetchQuery(rw http.ResponseWriter, req *http.Request, target, modulePath, moduleQuery string, noFetch bool) {
+func (g *Goproxy) serveFetchQuery(rw http.ResponseWriter, req *http.Request, target, modulePath, moduleQuery string) {
 	const (
 		contentType        = "application/json; charset=utf-8"
 		cacheControlMaxAge = 60
 	)
-	if noFetch {
+	if g.NoFetch {
 		g.serveCache(rw, req, target, contentType, cacheControlMaxAge, nil)
 		return
 	}
 	version, time, err := g.fetcher.Query(req.Context(), modulePath, moduleQuery)
 	if err != nil {
 		g.serveCache(rw, req, target, contentType, cacheControlMaxAge, func() {
-			g.logErrorf("failed to query module version: %s: %v", target, err)
+			logger.Error("failed to query module version", zap.String("target", target), zap.Error(err))
 			responseError(rw, req, err, true)
 		})
 		return
@@ -212,19 +207,19 @@ func (g *Goproxy) serveFetchQuery(rw http.ResponseWriter, req *http.Request, tar
 }
 
 // serveFetchList serves fetch list requests.
-func (g *Goproxy) serveFetchList(rw http.ResponseWriter, req *http.Request, target, modulePath string, noFetch bool) {
+func (g *Goproxy) serveFetchList(rw http.ResponseWriter, req *http.Request, target, modulePath string) {
 	const (
 		contentType        = "text/plain; charset=utf-8"
 		cacheControlMaxAge = 60
 	)
-	if noFetch {
+	if g.NoFetch {
 		g.serveCache(rw, req, target, contentType, cacheControlMaxAge, nil)
 		return
 	}
 	versions, err := g.fetcher.List(req.Context(), modulePath)
 	if err != nil {
 		g.serveCache(rw, req, target, contentType, cacheControlMaxAge, func() {
-			g.logErrorf("failed to list module versions: %s: %v", target, err)
+			logger.Error("failed to list module versions", zap.String("target", target), zap.Error(err))
 			responseError(rw, req, err, true)
 		})
 		return
@@ -233,7 +228,7 @@ func (g *Goproxy) serveFetchList(rw http.ResponseWriter, req *http.Request, targ
 }
 
 // serveFetchDownload serves fetch download requests.
-func (g *Goproxy) serveFetchDownload(rw http.ResponseWriter, req *http.Request, target, modulePath, moduleVersion string, noFetch bool) {
+func (g *Goproxy) serveFetchDownload(rw http.ResponseWriter, req *http.Request, target, modulePath, moduleVersion string) {
 	const cacheControlMaxAge = 604800
 
 	ext := path.Ext(target)
@@ -247,7 +242,7 @@ func (g *Goproxy) serveFetchDownload(rw http.ResponseWriter, req *http.Request, 
 		contentType = "application/zip"
 	}
 
-	if noFetch {
+	if g.NoFetch {
 		g.serveCache(rw, req, target, contentType, cacheControlMaxAge, nil)
 		return
 	}
@@ -256,14 +251,14 @@ func (g *Goproxy) serveFetchDownload(rw http.ResponseWriter, req *http.Request, 
 		responseSuccess(rw, req, content, contentType, cacheControlMaxAge)
 		return
 	} else if !errors.Is(err, fs.ErrNotExist) {
-		g.logErrorf("failed to get cached module file: %s: %v", target, err)
+		logger.Error("failed to get cached module file", zap.String("target", target), zap.Error(err))
 		responseInternalServerError(rw, req)
 		return
 	}
 
 	info, mod, zip, err := g.fetcher.Download(req.Context(), modulePath, moduleVersion)
 	if err != nil {
-		g.logErrorf("failed to download module version: %s: %v", target, err)
+		logger.Error("failed to download module version", zap.String("target", target), zap.Error(err))
 		responseError(rw, req, err, false)
 		return
 	}
@@ -283,7 +278,7 @@ func (g *Goproxy) serveFetchDownload(rw http.ResponseWriter, req *http.Request, 
 		{".zip", zip},
 	} {
 		if err := g.putCache(req.Context(), targetWithoutExt+cache.ext, cache.content); err != nil {
-			g.logErrorf("failed to cache module file: %s: %v", target, err)
+			logger.Error("failed to cache module file", zap.String("target", target), zap.Error(err))
 			responseInternalServerError(rw, req)
 			return
 		}
@@ -299,7 +294,7 @@ func (g *Goproxy) serveFetchDownload(rw http.ResponseWriter, req *http.Request, 
 		content = zip
 	}
 	if _, err := content.Seek(0, io.SeekStart); err != nil {
-		g.logErrorf("failed to seek: %v", err)
+		logger.Error("failed to seek", zap.Error(err))
 		responseInternalServerError(rw, req)
 		return
 	}
@@ -342,10 +337,13 @@ func (g *Goproxy) serveSumDB(rw http.ResponseWriter, req *http.Request, target s
 		responseNotFound(rw, req, 86400)
 		return
 	}
-
+	if g.NoFetch {
+		g.serveCache(rw, req, target, contentType, cacheControlMaxAge, nil)
+		return
+	}
 	tempDir, err := os.MkdirTemp(g.TempDir, tempDirPattern)
 	if err != nil {
-		g.logErrorf("failed to create temporary directory: %v", err)
+		logger.Error("failed to create temporary directory", zap.Error(err))
 		responseInternalServerError(rw, req)
 		return
 	}
@@ -354,7 +352,7 @@ func (g *Goproxy) serveSumDB(rw http.ResponseWriter, req *http.Request, target s
 	file, err := httpGetTemp(req.Context(), g.httpClient, appendURL(u, path).String(), tempDir)
 	if err != nil {
 		g.serveCache(rw, req, target, contentType, cacheControlMaxAge, func() {
-			g.logErrorf("failed to proxy checksum database: %s: %v", target, err)
+			logger.Error("failed to proxy checksum database", zap.String("target", target), zap.Error(err))
 			responseError(rw, req, err, true)
 		})
 		return
@@ -374,7 +372,7 @@ func (g *Goproxy) serveCache(rw http.ResponseWriter, req *http.Request, name, co
 			}
 			return
 		}
-		g.logErrorf("failed to get cached module file: %s: %v", name, err)
+		logger.Error("failed to get cached module file", zap.String("name", name), zap.Error(err))
 		responseInternalServerError(rw, req)
 		return
 	}
@@ -385,12 +383,12 @@ func (g *Goproxy) serveCache(rw http.ResponseWriter, req *http.Request, name, co
 // servePutCache serves requests after putting the content to the g.Cacher.
 func (g *Goproxy) servePutCache(rw http.ResponseWriter, req *http.Request, name, contentType string, cacheControlMaxAge int, content io.ReadSeeker) {
 	if err := g.putCache(req.Context(), name, content); err != nil {
-		g.logErrorf("failed to cache module file: %s: %v", name, err)
+		logger.Error("failed to cache module file", zap.String("name", name), zap.Error(err))
 		responseInternalServerError(rw, req)
 		return
 	}
 	if _, err := content.Seek(0, io.SeekStart); err != nil {
-		g.logErrorf("failed to seek: %v", err)
+		logger.Error("failed to seek", zap.Error(err))
 		responseInternalServerError(rw, req)
 		return
 	}
@@ -402,7 +400,7 @@ func (g *Goproxy) servePutCache(rw http.ResponseWriter, req *http.Request, name,
 func (g *Goproxy) servePutCacheFile(rw http.ResponseWriter, req *http.Request, name, contentType string, cacheControlMaxAge int, file string) {
 	f, err := os.Open(file)
 	if err != nil {
-		g.logErrorf("failed to open file: %v", err)
+		logger.Error("failed to open file", zap.Error(err))
 		responseInternalServerError(rw, req)
 		return
 	}
@@ -434,16 +432,6 @@ func (g *Goproxy) putCacheFile(ctx context.Context, name, file string) error {
 	}
 	defer f.Close()
 	return g.putCache(ctx, name, f)
-}
-
-// logErrorf formats according to a format specifier and writes to the g.ErrorLogger.
-func (g *Goproxy) logErrorf(format string, v ...any) {
-	msg := "goproxy: " + fmt.Sprintf(format, v...)
-	if g.ErrorLogger != nil {
-		g.ErrorLogger.Output(2, msg)
-	} else {
-		log.Output(2, msg)
-	}
 }
 
 // cleanPath returns the canonical path for the p.
