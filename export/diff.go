@@ -62,21 +62,16 @@ func buildNewTree(bucket *bbolt.Bucket, ctx context.Context, cher cache.Cacher, 
 	return dirent.Id, nil
 }
 
-func GetHead(tx *bbolt.Tx) (*obj.CheckPoint, error) {
-	bucket := tx.Bucket(cfgKey)
-	if bucket == nil {
-		return nil, errors.Errorf("bucket %s is missing", string(cfgKey))
-	}
-	data := bucket.Get(headKey)
+func GetCheckPoint(tx *bbolt.Tx, id []byte) (*obj.CheckPoint, error) {
 	info := &obj.CheckPoint{Parent: EmptyId, Id: EmptyId}
-	if data == nil {
+	if id == nil || bytes.Equal(id, EmptyId) {
 		return info, nil
 	}
-	bucket = tx.Bucket(checkPointKey)
+	bucket := tx.Bucket(checkPointKey)
 	if bucket == nil {
 		return nil, errors.Errorf("bucket %s is missing", string(checkPointKey))
 	}
-	data = bucket.Get(data)
+	data := bucket.Get(id)
 	if data == nil {
 		return nil, errors.Errorf("checkponit %s data is missing", hex.EncodeToString(data))
 	}
@@ -85,6 +80,15 @@ func GetHead(tx *bbolt.Tx) (*obj.CheckPoint, error) {
 		return nil, errors.Annotatef(err, "unmarshal checkpoint %s data", hex.EncodeToString(data))
 	}
 	return info, nil
+}
+
+func GetHead(tx *bbolt.Tx) (*obj.CheckPoint, error) {
+	bucket := tx.Bucket(cfgKey)
+	if bucket == nil {
+		return nil, errors.Errorf("bucket %s is missing", string(cfgKey))
+	}
+	data := bucket.Get(headKey)
+	return GetCheckPoint(tx, data)
 }
 
 func SetHead(tx *bbolt.Tx, id []byte) error {
@@ -133,7 +137,7 @@ func CreateCheckPoint(tx *bbolt.Tx, ctx context.Context, desc string, cher cache
 		return nil, err
 	}
 	newHeader := &obj.CheckPoint{
-		Parent: head.Parent,
+		Parent: head.Id,
 		Desc:   desc,
 		Mtime:  time.Now().UnixMilli()}
 	newHeader.Id, err = BuildNewTree(tx, ctx, cher)
@@ -255,7 +259,7 @@ func diffTreesRecursive(trees []*obj.DirEntry, baseDir string, opt *DiffOpt) err
 
 				if firstName == "" {
 					firstName = dent.Name
-				} else if strings.Compare(dent.Name, firstName) > 0 {
+				} else if strings.Compare(dent.Name, firstName) < 0 {
 					firstName = dent.Name
 				}
 			}
