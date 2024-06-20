@@ -1,7 +1,9 @@
-package internal
+package cache
 
 import (
 	"context"
+	"github.com/goproxy/goproxy/obj"
+	"github.com/juju/errors"
 	"io"
 	"io/fs"
 	"net/http"
@@ -14,52 +16,47 @@ import (
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
-// s3Cacher implements [github.com/goproxy/goproxy.Cacher] using an
+// S3Cacher implements [github.com/goproxy/goproxy.Cacher] using an
 // S3-compatible service.
-type s3Cacher struct {
+type S3Cacher struct {
 	client   *minio.Client
 	bucket   string
 	partSize int64
 }
 
-// s3CacherOptions is the options for creating a new [s3Cacher].
-type s3CacherOptions struct {
-	accessKeyID     string
-	secretAccessKey string
-	endpoint        string
-	disableTLS      bool
-	transport       http.RoundTripper
-	region          string
-	bucket          string
-	forcePathStyle  bool
-	partSize        int64
+// S3CacherOptions is the options for creating a new [S3Cacher].
+type S3CacherOptions struct {
+	AccessKeyID     string
+	SecretAccessKey string
+	Endpoint        string
+	Secure          bool
+	Transport       http.RoundTripper
+	Region          string
+	Bucket          string
+	PartSize        int64
 }
 
-// newS3Cacher creates a new [s3Cacher].
-func newS3Cacher(opts s3CacherOptions) (*s3Cacher, error) {
+// NewS3Cacher creates a new [S3Cacher].
+func NewS3Cacher(opts S3CacherOptions) (*S3Cacher, error) {
 	clientOpts := &minio.Options{
-		Creds:        credentials.NewStaticV4(opts.accessKeyID, opts.secretAccessKey, ""),
-		Secure:       !opts.disableTLS,
-		Transport:    opts.transport,
-		Region:       opts.region,
-		BucketLookup: minio.BucketLookupDNS,
+		Creds:     credentials.NewStaticV4(opts.AccessKeyID, opts.SecretAccessKey, ""),
+		Secure:    opts.Secure,
+		Transport: opts.Transport,
+		Region:    opts.Region,
 	}
-	if opts.forcePathStyle {
-		clientOpts.BucketLookup = minio.BucketLookupPath
-	}
-	client, err := minio.New(opts.endpoint, clientOpts)
+	client, err := minio.New(opts.Endpoint, clientOpts)
 	if err != nil {
 		return nil, err
 	}
-	return &s3Cacher{
+	return &S3Cacher{
 		client:   client,
-		bucket:   opts.bucket,
-		partSize: opts.partSize,
+		bucket:   opts.Bucket,
+		partSize: opts.PartSize,
 	}, nil
 }
 
 // Get implements [github.com/goproxy/goproxy.Cacher].
-func (s3c *s3Cacher) Get(ctx context.Context, name string) (io.ReadCloser, error) {
+func (s3c *S3Cacher) Get(ctx context.Context, name string) (io.ReadCloser, error) {
 	o, err := s3c.client.GetObject(ctx, s3c.bucket, name, minio.GetObjectOptions{})
 	if err != nil {
 		if minio.ToErrorResponse(err).StatusCode == http.StatusNotFound {
@@ -78,7 +75,7 @@ func (s3c *s3Cacher) Get(ctx context.Context, name string) (io.ReadCloser, error
 }
 
 // Put implements [github.com/goproxy/goproxy.Cacher].
-func (s3c *s3Cacher) Put(ctx context.Context, name string, content io.ReadSeeker) error {
+func (s3c *S3Cacher) Put(ctx context.Context, name string, content io.ReadSeeker) error {
 	size, err := content.Seek(0, io.SeekEnd)
 	if err != nil {
 		return err
@@ -113,23 +110,42 @@ func (s3c *s3Cacher) Put(ctx context.Context, name string, content io.ReadSeeker
 	return err
 }
 
-func (s3c *s3Cacher) Walk(ctx context.Context, fn func(name string) (bool, error)) error {
+func (s3c *S3Cacher) List(ctx context.Context, name string) ([]*obj.Dirent, error) {
+	if !strings.HasSuffix(name, "/") {
+		name += "/"
+	}
 	objects := s3c.client.ListObjects(ctx, s3c.bucket, minio.ListObjectsOptions{
-		Recursive: true,
+		Recursive: false,
+		Prefix:    name,
 	})
+	var result []*obj.Dirent
+	var err error
 	for info := range objects {
 		if info.Err != nil {
-			return info.Err
+			return nil, errors.Annotate(info.Err, "list Bucket")
 		}
-		loop, err := fn(info.Key)
-		if err != nil || !loop {
-			return err
+		if info.Err != nil {
+			return nil, info.Err
 		}
+		dirent := &obj.Dirent{
+			Size: info.Size,
+		}
+		dirent.Name, err = filepath.Rel(name, info.Key)
+		if err != nil {
+			return nil, errors.Annotate(err, "relative path")
+		}
+		if info.LastModified.IsZero() {
+			dirent.Name = strings.Trim(dirent.Name, "/\\")
+			dirent.IsDir = true
+		} else {
+			dirent.Mtime = info.LastModified.UnixMilli()
+		}
+		result = append(result, dirent)
 	}
-	return nil
+	return result, nil
 }
 
-// s3Cache is the cache returned by [s3Cacher.Get].
+// s3Cache is the cache returned by [S3Cacher.Get].
 type s3Cache struct {
 	*minio.Object
 	minio.ObjectInfo

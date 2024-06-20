@@ -7,6 +7,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/goproxy/goproxy/cache"
+	"github.com/goproxy/goproxy/export"
 	"github.com/goproxy/goproxy/logger"
 	"go.uber.org/zap"
 	"io"
@@ -55,7 +57,7 @@ type Goproxy struct {
 	// Cacher is used to cache module files.
 	//
 	// If Cacher is nil, caching is disabled.
-	Cacher Cacher
+	Cacher cache.Cacher
 
 	// TempDir is the directory for storing temporary files.
 	//
@@ -130,6 +132,12 @@ func (g *Goproxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 // serveFetch serves fetch requests.
 func (g *Goproxy) serveFetch(rw http.ResponseWriter, req *http.Request, target string) {
+	if !export.Lock.TryRLock() {
+		logger.Warn("The current request will be rejected because the export operation is running.", zap.String("method", req.Method), zap.String("URL", req.URL.String()))
+		responseInternalServerError(rw, req)
+		return
+	}
+	defer export.Lock.RUnlock()
 	escapedModulePath, after, ok := strings.Cut(target, "/@")
 	if !ok {
 		responseNotFound(rw, req, 86400, "missing /@v/")
@@ -269,7 +277,7 @@ func (g *Goproxy) serveFetchDownload(rw http.ResponseWriter, req *http.Request, 
 	}()
 
 	targetWithoutExt := strings.TrimSuffix(target, path.Ext(target))
-	for _, cache := range []struct {
+	for _, ch := range []struct {
 		ext     string
 		content io.ReadSeeker
 	}{
@@ -277,8 +285,8 @@ func (g *Goproxy) serveFetchDownload(rw http.ResponseWriter, req *http.Request, 
 		{".mod", mod},
 		{".zip", zip},
 	} {
-		if err := g.putCache(req.Context(), targetWithoutExt+cache.ext, cache.content); err != nil {
-			logger.Error("failed to cache module file", zap.String("target", target), zap.Error(err))
+		if err := g.putCache(req.Context(), targetWithoutExt+ch.ext, ch.content); err != nil {
+			logger.Error("failed to ch module file", zap.String("target", target), zap.Error(err))
 			responseInternalServerError(rw, req)
 			return
 		}

@@ -1,8 +1,9 @@
-package goproxy
+package cache
 
 import (
 	"context"
 	"errors"
+	"github.com/goproxy/goproxy/utils"
 	"io"
 	"io/fs"
 	"os"
@@ -16,7 +17,7 @@ func TestDirCacher(t *testing.T) {
 
 	if rc, err := dirCacher.Get(context.Background(), "a/b/c"); err == nil {
 		t.Fatal("expected error")
-	} else if got, want := err, fs.ErrNotExist; !compareErrors(got, want) {
+	} else if got, want := err, fs.ErrNotExist; !utils.CompareErrors(got, want) {
 		t.Fatalf("got %q, want %q", got, want)
 	} else if got := rc; got != nil {
 		t.Errorf("got %#v, want nil", got)
@@ -50,9 +51,9 @@ func TestDirCacher(t *testing.T) {
 		t.Errorf("got %q, want %q", got, want)
 	}
 
-	if err := dirCacher.Put(context.Background(), "d/e/f", &testReadSeeker{
+	if err := dirCacher.Put(context.Background(), "d/e/f", &utils.TestReadSeeker{
 		ReadSeeker: strings.NewReader("foobar"),
-		read: func(rs io.ReadSeeker, p []byte) (n int, err error) {
+		ReadF: func(rs io.ReadSeeker, p []byte) (n int, err error) {
 			return 0, errors.New("cannot read")
 		},
 	}); err == nil {

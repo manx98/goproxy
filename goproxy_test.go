@@ -6,6 +6,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/goproxy/goproxy/cache"
+	"github.com/goproxy/goproxy/utils"
 	"io"
 	"io/fs"
 	"net/http"
@@ -138,7 +140,7 @@ func TestGoproxyServeHTTP(t *testing.T) {
 				Env:     []string{"GOPROXY=" + proxyServer.URL, "GOSUMDB=off"},
 				TempDir: t.TempDir(),
 			},
-			Cacher:  DirCacher(t.TempDir()),
+			Cacher:  cache.DirCacher(t.TempDir()),
 			TempDir: t.TempDir(),
 		}
 		rec := httptest.NewRecorder()
@@ -192,7 +194,7 @@ func TestGoproxyServeFetch(t *testing.T) {
 	})
 	for _, tt := range []struct {
 		n                  int
-		cacher             Cacher
+		cacher             cache.Cacher
 		target             string
 		disableModuleFetch bool
 		wantStatusCode     int
@@ -211,8 +213,8 @@ func TestGoproxyServeFetch(t *testing.T) {
 		{
 			n: 2,
 			cacher: &testCacher{
-				Cacher: DirCacher(t.TempDir()),
-				get: func(ctx context.Context, c Cacher, name string) (io.ReadCloser, error) {
+				Cacher: cache.DirCacher(t.TempDir()),
+				get: func(ctx context.Context, c cache.Cacher, name string) (io.ReadCloser, error) {
 					return io.NopCloser(strings.NewReader(info)), nil
 				},
 			},
@@ -234,8 +236,8 @@ func TestGoproxyServeFetch(t *testing.T) {
 		{
 			n: 4,
 			cacher: &testCacher{
-				Cacher: DirCacher(t.TempDir()),
-				get: func(ctx context.Context, c Cacher, name string) (io.ReadCloser, error) {
+				Cacher: cache.DirCacher(t.TempDir()),
+				get: func(ctx context.Context, c cache.Cacher, name string) (io.ReadCloser, error) {
 					return io.NopCloser(strings.NewReader(list)), nil
 				},
 			},
@@ -257,8 +259,8 @@ func TestGoproxyServeFetch(t *testing.T) {
 		{
 			n: 6,
 			cacher: &testCacher{
-				Cacher: DirCacher(t.TempDir()),
-				get: func(ctx context.Context, c Cacher, name string) (io.ReadCloser, error) {
+				Cacher: cache.DirCacher(t.TempDir()),
+				get: func(ctx context.Context, c cache.Cacher, name string) (io.ReadCloser, error) {
 					return io.NopCloser(strings.NewReader(info)), nil
 				},
 			},
@@ -304,8 +306,8 @@ func TestGoproxyServeFetch(t *testing.T) {
 		{
 			n: 11,
 			cacher: &testCacher{
-				Cacher: DirCacher(t.TempDir()),
-				get: func(ctx context.Context, c Cacher, name string) (io.ReadCloser, error) {
+				Cacher: cache.DirCacher(t.TempDir()),
+				get: func(ctx context.Context, c cache.Cacher, name string) (io.ReadCloser, error) {
 					return io.NopCloser(strings.NewReader(mod)), nil
 				},
 			},
@@ -327,8 +329,8 @@ func TestGoproxyServeFetch(t *testing.T) {
 		{
 			n: 13,
 			cacher: &testCacher{
-				Cacher: DirCacher(t.TempDir()),
-				get: func(ctx context.Context, c Cacher, name string) (io.ReadCloser, error) {
+				Cacher: cache.DirCacher(t.TempDir()),
+				get: func(ctx context.Context, c cache.Cacher, name string) (io.ReadCloser, error) {
 					return io.NopCloser(bytes.NewReader(zip)), nil
 				},
 			},
@@ -421,7 +423,7 @@ func TestGoproxyServeFetch(t *testing.T) {
 		},
 	} {
 		if tt.cacher == nil {
-			tt.cacher = DirCacher(t.TempDir())
+			tt.cacher = cache.DirCacher(t.TempDir())
 		}
 		g := &Goproxy{
 			Fetcher: &GoFetcher{
@@ -466,7 +468,7 @@ func TestGoproxyServeFetchQuery(t *testing.T) {
 	for _, tt := range []struct {
 		n                int
 		proxyHandler     http.HandlerFunc
-		cacher           Cacher
+		cacher           cache.Cacher
 		noFetch          bool
 		wantStatusCode   int
 		wantContentType  string
@@ -483,8 +485,8 @@ func TestGoproxyServeFetchQuery(t *testing.T) {
 		{
 			n: 2,
 			cacher: &testCacher{
-				Cacher: DirCacher(t.TempDir()),
-				get: func(ctx context.Context, c Cacher, name string) (io.ReadCloser, error) {
+				Cacher: cache.DirCacher(t.TempDir()),
+				get: func(ctx context.Context, c cache.Cacher, name string) (io.ReadCloser, error) {
 					return io.NopCloser(strings.NewReader(info)), nil
 				},
 			},
@@ -508,7 +510,7 @@ func TestGoproxyServeFetchQuery(t *testing.T) {
 		}
 		setProxyHandler(tt.proxyHandler)
 		if tt.cacher == nil {
-			tt.cacher = DirCacher(t.TempDir())
+			tt.cacher = cache.DirCacher(t.TempDir())
 		}
 		g := &Goproxy{
 			Fetcher: &GoFetcher{
@@ -549,7 +551,7 @@ func TestGoproxyServeFetchList(t *testing.T) {
 	for _, tt := range []struct {
 		n              int
 		proxyHandler   http.HandlerFunc
-		cacher         Cacher
+		cacher         cache.Cacher
 		noFetch        bool
 		wantStatusCode int
 		wantContent    string
@@ -562,8 +564,8 @@ func TestGoproxyServeFetchList(t *testing.T) {
 		{
 			n: 2,
 			cacher: &testCacher{
-				Cacher: DirCacher(t.TempDir()),
-				get: func(ctx context.Context, c Cacher, name string) (io.ReadCloser, error) {
+				Cacher: cache.DirCacher(t.TempDir()),
+				get: func(ctx context.Context, c cache.Cacher, name string) (io.ReadCloser, error) {
 					return io.NopCloser(strings.NewReader(list)), nil
 				},
 			},
@@ -583,7 +585,7 @@ func TestGoproxyServeFetchList(t *testing.T) {
 		}
 		setProxyHandler(tt.proxyHandler)
 		if tt.cacher == nil {
-			tt.cacher = DirCacher(t.TempDir())
+			tt.cacher = cache.DirCacher(t.TempDir())
 		}
 		g := &Goproxy{
 			Fetcher: &GoFetcher{
@@ -638,7 +640,7 @@ func TestGoproxyServeFetchDownload(t *testing.T) {
 	for _, tt := range []struct {
 		n                int
 		proxyHandler     http.HandlerFunc
-		cacher           Cacher
+		cacher           cache.Cacher
 		target           string
 		noFetch          bool
 		wantStatusCode   int
@@ -657,8 +659,8 @@ func TestGoproxyServeFetchDownload(t *testing.T) {
 		{
 			n: 2,
 			cacher: &testCacher{
-				Cacher: DirCacher(t.TempDir()),
-				get: func(ctx context.Context, c Cacher, name string) (io.ReadCloser, error) {
+				Cacher: cache.DirCacher(t.TempDir()),
+				get: func(ctx context.Context, c cache.Cacher, name string) (io.ReadCloser, error) {
 					return io.NopCloser(strings.NewReader(info)), nil
 				},
 			},
@@ -671,8 +673,8 @@ func TestGoproxyServeFetchDownload(t *testing.T) {
 		{
 			n: 3,
 			cacher: &testCacher{
-				Cacher: DirCacher(t.TempDir()),
-				get: func(ctx context.Context, c Cacher, name string) (io.ReadCloser, error) {
+				Cacher: cache.DirCacher(t.TempDir()),
+				get: func(ctx context.Context, c cache.Cacher, name string) (io.ReadCloser, error) {
 					return io.NopCloser(strings.NewReader(info)), nil
 				},
 			},
@@ -720,8 +722,8 @@ func TestGoproxyServeFetchDownload(t *testing.T) {
 		{
 			n: 8,
 			cacher: &testCacher{
-				Cacher: DirCacher(t.TempDir()),
-				get: func(ctx context.Context, c Cacher, name string) (io.ReadCloser, error) {
+				Cacher: cache.DirCacher(t.TempDir()),
+				get: func(ctx context.Context, c cache.Cacher, name string) (io.ReadCloser, error) {
 					return nil, errors.New("cannot get")
 				},
 			},
@@ -733,8 +735,8 @@ func TestGoproxyServeFetchDownload(t *testing.T) {
 		{
 			n: 9,
 			cacher: &testCacher{
-				Cacher: DirCacher(t.TempDir()),
-				put: func(ctx context.Context, c Cacher, name string, content io.ReadSeeker) error {
+				Cacher: cache.DirCacher(t.TempDir()),
+				put: func(ctx context.Context, c cache.Cacher, name string, content io.ReadSeeker) error {
 					return errors.New("cannot put")
 				},
 			},
@@ -746,8 +748,8 @@ func TestGoproxyServeFetchDownload(t *testing.T) {
 		{
 			n: 10,
 			cacher: &testCacher{
-				Cacher: DirCacher(t.TempDir()),
-				put: func(ctx context.Context, c Cacher, name string, content io.ReadSeeker) error {
+				Cacher: cache.DirCacher(t.TempDir()),
+				put: func(ctx context.Context, c cache.Cacher, name string, content io.ReadSeeker) error {
 					if err := c.Put(ctx, name, content); err != nil {
 						return err
 					}
@@ -765,7 +767,7 @@ func TestGoproxyServeFetchDownload(t *testing.T) {
 		}
 		setProxyHandler(tt.proxyHandler)
 		if tt.cacher == nil {
-			tt.cacher = DirCacher(t.TempDir())
+			tt.cacher = cache.DirCacher(t.TempDir())
 		}
 		g := &Goproxy{
 			Fetcher: &GoFetcher{
@@ -815,7 +817,7 @@ func TestGoproxyServeSumDB(t *testing.T) {
 	for _, tt := range []struct {
 		n                int
 		sumdbHandler     http.HandlerFunc
-		cacher           Cacher
+		cacher           cache.Cacher
 		tempDir          string
 		target           string
 		wantStatusCode   int
@@ -865,8 +867,8 @@ func TestGoproxyServeSumDB(t *testing.T) {
 		{
 			n: 6,
 			cacher: &testCacher{
-				Cacher: DirCacher(t.TempDir()),
-				put: func(ctx context.Context, c Cacher, name string, content io.ReadSeeker) error {
+				Cacher: cache.DirCacher(t.TempDir()),
+				put: func(ctx context.Context, c cache.Cacher, name string, content io.ReadSeeker) error {
 					return errors.New("cannot put")
 				},
 			},
@@ -921,7 +923,7 @@ func TestGoproxyServeSumDB(t *testing.T) {
 		}
 		setSumDBHandler(tt.sumdbHandler)
 		if tt.cacher == nil {
-			tt.cacher = DirCacher(t.TempDir())
+			tt.cacher = cache.DirCacher(t.TempDir())
 		}
 		if tt.tempDir == "" {
 			tt.tempDir = t.TempDir()
@@ -955,7 +957,7 @@ func TestGoproxyServeSumDB(t *testing.T) {
 func TestGoproxyServeCache(t *testing.T) {
 	for _, tt := range []struct {
 		n              int
-		cacher         Cacher
+		cacher         cache.Cacher
 		onNotFound     func(rw http.ResponseWriter, req *http.Request)
 		wantStatusCode int
 		wantContent    string
@@ -963,8 +965,8 @@ func TestGoproxyServeCache(t *testing.T) {
 		{
 			n: 1,
 			cacher: &testCacher{
-				Cacher: DirCacher(t.TempDir()),
-				get: func(ctx context.Context, c Cacher, name string) (io.ReadCloser, error) {
+				Cacher: cache.DirCacher(t.TempDir()),
+				get: func(ctx context.Context, c cache.Cacher, name string) (io.ReadCloser, error) {
 					return io.NopCloser(strings.NewReader("foobar")), nil
 				},
 			},
@@ -985,8 +987,8 @@ func TestGoproxyServeCache(t *testing.T) {
 		{
 			n: 4,
 			cacher: &testCacher{
-				Cacher: DirCacher(t.TempDir()),
-				get: func(ctx context.Context, c Cacher, name string) (io.ReadCloser, error) {
+				Cacher: cache.DirCacher(t.TempDir()),
+				get: func(ctx context.Context, c cache.Cacher, name string) (io.ReadCloser, error) {
 					return nil, errors.New("cannot get")
 				},
 			},
@@ -995,7 +997,7 @@ func TestGoproxyServeCache(t *testing.T) {
 		},
 	} {
 		if tt.cacher == nil {
-			tt.cacher = DirCacher(t.TempDir())
+			tt.cacher = cache.DirCacher(t.TempDir())
 		}
 		g := &Goproxy{
 			Cacher:  tt.cacher,
@@ -1058,7 +1060,7 @@ func TestGoproxyServePutCache(t *testing.T) {
 		},
 	} {
 		g := &Goproxy{
-			Cacher:  DirCacher(t.TempDir()),
+			Cacher:  cache.DirCacher(t.TempDir()),
 			TempDir: t.TempDir(),
 		}
 		g.initOnce.Do(g.init)
@@ -1097,7 +1099,7 @@ func TestGoproxyServePutCacheFile(t *testing.T) {
 		},
 	} {
 		g := &Goproxy{
-			Cacher:  DirCacher(t.TempDir()),
+			Cacher:  cache.DirCacher(t.TempDir()),
 			TempDir: t.TempDir(),
 		}
 		g.initOnce.Do(g.init)
@@ -1120,7 +1122,7 @@ func TestGoproxyServePutCacheFile(t *testing.T) {
 }
 
 func TestGoproxyCache(t *testing.T) {
-	dc := DirCacher(t.TempDir())
+	dc := cache.DirCacher(t.TempDir())
 	g := &Goproxy{Cacher: dc, TempDir: t.TempDir()}
 	g.initOnce.Do(g.init)
 	if err := os.WriteFile(filepath.Join(string(dc), "foo"), []byte("bar"), 0o644); err != nil {
@@ -1137,7 +1139,7 @@ func TestGoproxyCache(t *testing.T) {
 	}
 	if _, err := g.cache(context.Background(), "bar"); err == nil {
 		t.Fatal("expected error")
-	} else if got, want := err, fs.ErrNotExist; !compareErrors(got, want) {
+	} else if got, want := err, fs.ErrNotExist; !utils.CompareErrors(got, want) {
 		t.Errorf("got %q, want %q", got, want)
 	}
 
@@ -1145,13 +1147,13 @@ func TestGoproxyCache(t *testing.T) {
 	g.initOnce.Do(g.init)
 	if _, err := g.cache(context.Background(), ""); err == nil {
 		t.Fatal("expected error")
-	} else if got, want := err, fs.ErrNotExist; !compareErrors(got, want) {
+	} else if got, want := err, fs.ErrNotExist; !utils.CompareErrors(got, want) {
 		t.Errorf("got %q, want %q", got, want)
 	}
 }
 
 func TestGoproxyPutCache(t *testing.T) {
-	dc := DirCacher(t.TempDir())
+	dc := cache.DirCacher(t.TempDir())
 	g := &Goproxy{Cacher: dc, TempDir: t.TempDir()}
 	g.initOnce.Do(g.init)
 	if err := g.putCache(context.Background(), "foo", strings.NewReader("bar")); err != nil {
@@ -1171,7 +1173,7 @@ func TestGoproxyPutCache(t *testing.T) {
 }
 
 func TestGoproxyPutCacheFile(t *testing.T) {
-	dc := DirCacher(t.TempDir())
+	dc := cache.DirCacher(t.TempDir())
 	g := &Goproxy{Cacher: dc, TempDir: t.TempDir()}
 	g.initOnce.Do(g.init)
 
@@ -1190,7 +1192,7 @@ func TestGoproxyPutCacheFile(t *testing.T) {
 
 	if err := g.putCacheFile(context.Background(), "bar", filepath.Join(string(dc), "bar-sourcel")); err == nil {
 		t.Fatal("expected error")
-	} else if got, want := err, fs.ErrNotExist; !compareErrors(got, want) {
+	} else if got, want := err, fs.ErrNotExist; !utils.CompareErrors(got, want) {
 		t.Errorf("got %q, want %q", got, want)
 	}
 }
@@ -1214,13 +1216,6 @@ func TestCleanPath(t *testing.T) {
 			t.Errorf("test(%d): got %q, want %q", tt.n, got, want)
 		}
 	}
-}
-
-func compareErrors(got, want error) bool {
-	if want != fs.ErrNotExist && errors.Is(want, fs.ErrNotExist) {
-		return errors.Is(got, fs.ErrNotExist) && got.Error() == want.Error()
-	}
-	return errors.Is(got, want) || got.Error() == want.Error()
 }
 
 func newHTTPTestServer() (server *httptest.Server, setHandler func(http.HandlerFunc)) {
@@ -1272,30 +1267,10 @@ func makeZip(files map[string][]byte) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-type testReadSeeker struct {
-	io.ReadSeeker
-	read func(rs io.ReadSeeker, p []byte) (n int, err error)
-	seek func(rs io.ReadSeeker, offset int64, whence int) (int64, error)
-}
-
-func (rs *testReadSeeker) Read(p []byte) (n int, err error) {
-	if rs.read != nil {
-		return rs.read(rs.ReadSeeker, p)
-	}
-	return rs.ReadSeeker.Read(p)
-}
-
-func (rs *testReadSeeker) Seek(offset int64, whence int) (int64, error) {
-	if rs.seek != nil {
-		return rs.seek(rs.ReadSeeker, offset, whence)
-	}
-	return rs.ReadSeeker.Seek(offset, whence)
-}
-
 type testCacher struct {
-	Cacher
-	get func(ctx context.Context, c Cacher, name string) (io.ReadCloser, error)
-	put func(ctx context.Context, c Cacher, name string, content io.ReadSeeker) error
+	cache.Cacher
+	get func(ctx context.Context, c cache.Cacher, name string) (io.ReadCloser, error)
+	put func(ctx context.Context, c cache.Cacher, name string, content io.ReadSeeker) error
 }
 
 func (c *testCacher) Get(ctx context.Context, name string) (io.ReadCloser, error) {

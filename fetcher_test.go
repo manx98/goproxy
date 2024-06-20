@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/goproxy/goproxy/utils"
 	"io"
 	"io/fs"
 	"net/http"
@@ -100,7 +101,7 @@ func TestGoFetcherInit(t *testing.T) {
 		if tt.wantInitErr != nil {
 			if gf.initErr == nil {
 				t.Fatalf("test(%d): expected error", tt.n)
-			} else if got, want := gf.initErr, tt.wantInitErr; !compareErrors(got, want) {
+			} else if got, want := gf.initErr, tt.wantInitErr; !utils.CompareErrors(got, want) {
 				t.Errorf("test(%d): got %q, want %q", tt.n, got, want)
 			}
 		} else {
@@ -252,7 +253,7 @@ func TestGoFetcherQuery(t *testing.T) {
 		if tt.wantErr != nil {
 			if err == nil {
 				t.Fatalf("test(%d): expected error", tt.n)
-			} else if got, want := err, tt.wantErr; !compareErrors(got, want) {
+			} else if got, want := err, tt.wantErr; !utils.CompareErrors(got, want) {
 				t.Errorf("test(%d): got %q, want %q", tt.n, got, want)
 			}
 		} else {
@@ -344,7 +345,7 @@ func TestGoFetcherProxyQuery(t *testing.T) {
 		if tt.wantErr != nil {
 			if err == nil {
 				t.Fatalf("test(%d): expected error", tt.n)
-			} else if got, want := err, tt.wantErr; !compareErrors(got, want) {
+			} else if got, want := err, tt.wantErr; !utils.CompareErrors(got, want) {
 				t.Errorf("test(%d): got %q, want %q", tt.n, got, want)
 			}
 		} else {
@@ -401,7 +402,7 @@ func TestGoFetcherDirectQuery(t *testing.T) {
 		if tt.wantErr != nil {
 			if err == nil {
 				t.Fatalf("test(%d): expected error", tt.n)
-			} else if got, want := err, tt.wantErr; !compareErrors(got, want) {
+			} else if got, want := err, tt.wantErr; !utils.CompareErrors(got, want) {
 				t.Errorf("test(%d): got %q, want %q", tt.n, got, want)
 			}
 		} else {
@@ -507,7 +508,7 @@ invalid
 		if tt.wantErr != nil {
 			if err == nil {
 				t.Fatalf("test(%d): expected error", tt.n)
-			} else if got, want := err, tt.wantErr; !compareErrors(got, want) {
+			} else if got, want := err, tt.wantErr; !utils.CompareErrors(got, want) {
 				t.Errorf("test(%d): got %q, want %q", tt.n, got, want)
 			}
 		} else {
@@ -570,7 +571,7 @@ func TestGoFetcherProxyList(t *testing.T) {
 		if tt.wantErr != nil {
 			if err == nil {
 				t.Fatalf("test(%d): expected error", tt.n)
-			} else if got, want := err, tt.wantErr; !compareErrors(got, want) {
+			} else if got, want := err, tt.wantErr; !utils.CompareErrors(got, want) {
 				t.Errorf("test(%d): got %q, want %q", tt.n, got, want)
 			}
 		} else {
@@ -631,7 +632,7 @@ func TestGoFetcherDirectList(t *testing.T) {
 		if tt.wantErr != nil {
 			if err == nil {
 				t.Fatalf("test(%d): expected error", tt.n)
-			} else if got, want := err, tt.wantErr; !compareErrors(got, want) {
+			} else if got, want := err, tt.wantErr; !utils.CompareErrors(got, want) {
 				t.Errorf("test(%d): got %q, want %q", tt.n, got, want)
 			}
 		} else {
@@ -864,7 +865,7 @@ func TestGoFetcherDownload(t *testing.T) {
 		if tt.wantErr != nil {
 			if err == nil {
 				t.Fatalf("test(%d): expected error", tt.n)
-			} else if got, want := err, tt.wantErr; !compareErrors(got, want) {
+			} else if got, want := err, tt.wantErr; !utils.CompareErrors(got, want) {
 				t.Errorf("test(%d): got %q, want %q", tt.n, got, want)
 			}
 		} else {
@@ -1014,7 +1015,7 @@ func TestGoFetcherProxyDownload(t *testing.T) {
 		if tt.wantErr != nil {
 			if err == nil {
 				t.Fatalf("test(%d): expected error", tt.n)
-			} else if got, want := err, tt.wantErr; !compareErrors(got, want) {
+			} else if got, want := err, tt.wantErr; !utils.CompareErrors(got, want) {
 				t.Errorf("test(%d): got %q, want %q", tt.n, got, want)
 			}
 		} else {
@@ -1042,17 +1043,17 @@ func TestGoFetcherProxyDownload(t *testing.T) {
 			cleanup()
 			if _, err := os.Stat(infoFile); err == nil {
 				t.Errorf("test(%d): expected error", tt.n)
-			} else if got, want := err, fs.ErrNotExist; !compareErrors(got, want) {
+			} else if got, want := err, fs.ErrNotExist; !utils.CompareErrors(got, want) {
 				t.Errorf("test(%d): got %q, want %q", tt.n, got, want)
 			}
 			if _, err := os.Stat(modFile); err == nil {
 				t.Errorf("test(%d): expected error", tt.n)
-			} else if got, want := err, fs.ErrNotExist; !compareErrors(got, want) {
+			} else if got, want := err, fs.ErrNotExist; !utils.CompareErrors(got, want) {
 				t.Errorf("test(%d): got %q, want %q", tt.n, got, want)
 			}
 			if _, err := os.Stat(zipFile); err == nil {
 				t.Errorf("test(%d): expected error", tt.n)
-			} else if got, want := err, fs.ErrNotExist; !compareErrors(got, want) {
+			} else if got, want := err, fs.ErrNotExist; !utils.CompareErrors(got, want) {
 				t.Errorf("test(%d): got %q, want %q", tt.n, got, want)
 			}
 		}
@@ -1115,7 +1116,7 @@ func TestGoFetcherDirectDownload(t *testing.T) {
 		if tt.wantErr != nil {
 			if err == nil {
 				t.Fatalf("test(%d): expected error", tt.n)
-			} else if got, want := err, tt.wantErr; !compareErrors(got, want) {
+			} else if got, want := err, tt.wantErr; !utils.CompareErrors(got, want) {
 				t.Errorf("test(%d): got %q, want %q", tt.n, got, want)
 			}
 		} else {
@@ -1218,7 +1219,7 @@ func TestGoFetcherExecGo(t *testing.T) {
 		if tt.wantErr != nil {
 			if err == nil {
 				t.Fatalf("test(%d): expected error", tt.n)
-			} else if got, want := err, tt.wantErr; !compareErrors(got, want) {
+			} else if got, want := err, tt.wantErr; !utils.CompareErrors(got, want) {
 				t.Errorf("test(%d): got %q, want %q", tt.n, got, want)
 			}
 		} else {
@@ -1303,7 +1304,7 @@ func TestCleanEnvGOPROXY(t *testing.T) {
 		if tt.wantErr != nil {
 			if err == nil {
 				t.Fatalf("test(%d): expected error", tt.n)
-			} else if got, want := err, tt.wantErr; !compareErrors(got, want) {
+			} else if got, want := err, tt.wantErr; !utils.CompareErrors(got, want) {
 				t.Errorf("test(%d): got %q, want %q", tt.n, got, want)
 			}
 		} else {
@@ -1406,7 +1407,7 @@ func TestWalkEnvGOPROXY(t *testing.T) {
 		if tt.wantErr != nil {
 			if err == nil {
 				t.Fatalf("test(%d): expected error", tt.n)
-			} else if got, want := err, tt.wantErr; !compareErrors(got, want) {
+			} else if got, want := err, tt.wantErr; !utils.CompareErrors(got, want) {
 				t.Errorf("test(%d): got %q, want %q", tt.n, got, want)
 			}
 		} else {
@@ -1523,7 +1524,7 @@ func TestParseEnvGOSUMDB(t *testing.T) {
 		if tt.wantErr != nil {
 			if err == nil {
 				t.Fatalf("test(%d): expected error", tt.n)
-			} else if got, want := err, tt.wantErr; !compareErrors(got, want) {
+			} else if got, want := err, tt.wantErr; !utils.CompareErrors(got, want) {
 				t.Errorf("test(%d): got %q, want %q", tt.n, got, want)
 			}
 		} else {
@@ -1606,7 +1607,7 @@ func TestCheckCanonicalVersion(t *testing.T) {
 		if tt.wantErr != nil {
 			if err == nil {
 				t.Fatalf("test(%d): expected error", tt.n)
-			} else if got, want := err, tt.wantErr; !compareErrors(got, want) {
+			} else if got, want := err, tt.wantErr; !utils.CompareErrors(got, want) {
 				t.Errorf("test(%d): got %q, want %q", tt.n, got, want)
 			}
 		} else if err != nil {
@@ -1663,7 +1664,7 @@ func TestUnmarshalInfo(t *testing.T) {
 		if tt.wantErr != nil {
 			if err == nil {
 				t.Fatalf("test(%d): expected error", tt.n)
-			} else if got, want := err, tt.wantErr; !compareErrors(got, want) {
+			} else if got, want := err, tt.wantErr; !utils.CompareErrors(got, want) {
 				t.Errorf("test(%d): got %q, want %q", tt.n, got, want)
 			}
 		} else {
@@ -1720,7 +1721,7 @@ func TestUnmarshalInfoFile(t *testing.T) {
 		if tt.wantErr != nil {
 			if err == nil {
 				t.Fatalf("test(%d): expected error", tt.n)
-			} else if got, want := err, tt.wantErr; !compareErrors(got, want) {
+			} else if got, want := err, tt.wantErr; !utils.CompareErrors(got, want) {
 				t.Errorf("test(%d): got %q, want %q", tt.n, got, want)
 			}
 		} else {
@@ -1760,7 +1761,7 @@ func TestCheckModFile(t *testing.T) {
 		if tt.wantErr != nil {
 			if err == nil {
 				t.Fatalf("test(%d): expected error", tt.n)
-			} else if got, want := err, tt.wantErr; !compareErrors(got, want) {
+			} else if got, want := err, tt.wantErr; !utils.CompareErrors(got, want) {
 				t.Errorf("test(%d): got %q, want %q", tt.n, got, want)
 			}
 		} else {
@@ -1862,7 +1863,7 @@ func TestVerifyModFile(t *testing.T) {
 		if tt.wantErr != nil {
 			if err == nil {
 				t.Fatalf("test(%d): expected error", tt.n)
-			} else if got, want := err, tt.wantErr; !compareErrors(got, want) {
+			} else if got, want := err, tt.wantErr; !utils.CompareErrors(got, want) {
 				t.Errorf("test(%d): got %q, want %q", tt.n, got, want)
 			}
 		} else {
@@ -1914,7 +1915,7 @@ func TestCheckZipFile(t *testing.T) {
 		if tt.wantErr != nil {
 			if err == nil {
 				t.Fatalf("test(%d): expected error", tt.n)
-			} else if got, want := err, tt.wantErr; !compareErrors(got, want) {
+			} else if got, want := err, tt.wantErr; !utils.CompareErrors(got, want) {
 				t.Errorf("test(%d): got %q, want %q", tt.n, got, want)
 			}
 		} else {
@@ -2026,7 +2027,7 @@ func TestVerifyZipFile(t *testing.T) {
 		if tt.wantErr != nil {
 			if err == nil {
 				t.Fatalf("test(%d): expected error", tt.n)
-			} else if got, want := err, tt.wantErr; !compareErrors(got, want) {
+			} else if got, want := err, tt.wantErr; !utils.CompareErrors(got, want) {
 				t.Errorf("test(%d): got %q, want %q", tt.n, got, want)
 			}
 		} else {

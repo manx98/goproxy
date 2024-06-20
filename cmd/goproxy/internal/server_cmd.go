@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"github.com/goproxy/goproxy/cache"
 	"net"
 	"net/http"
 	"os"
@@ -51,7 +52,7 @@ type serverCmdConfig struct {
 	proxiedSumDBs    []string
 	cacher           string
 	cacherDir        string
-	s3CacherOpts     s3CacherOptions
+	s3CacherOpts     cache.S3CacherOptions
 	tempDir          string
 	insecure         bool
 	connectTimeout   time.Duration
@@ -73,14 +74,13 @@ func newServerCmdConfig(cmd *cobra.Command) *serverCmdConfig {
 	fs.StringSliceVar(&cfg.proxiedSumDBs, "proxied-sumdbs", nil, "list of proxied checksum databases")
 	fs.StringVar(&cfg.cacher, "cacher", "dir", "cacher to use (valid values: dir, s3)")
 	fs.StringVar(&cfg.cacherDir, "cacher-dir", "caches", "directory for the dir cacher")
-	fs.StringVar(&cfg.s3CacherOpts.accessKeyID, "cacher-s3-access-key-id", "", "access key ID for the S3 cacher")
-	fs.StringVar(&cfg.s3CacherOpts.secretAccessKey, "cacher-s3-secret-access-key", "", "secret access key for the S3 cacher")
-	fs.StringVar(&cfg.s3CacherOpts.endpoint, "cacher-s3-endpoint", "s3.amazonaws.com", "endpoint for the S3 cacher")
-	fs.BoolVar(&cfg.s3CacherOpts.disableTLS, "cacher-s3-disable-tls", false, "disable TLS for the S3 cacher")
-	fs.StringVar(&cfg.s3CacherOpts.region, "cacher-s3-region", "us-east-1", "region for the S3 cacher")
-	fs.StringVar(&cfg.s3CacherOpts.bucket, "cacher-s3-bucket", "", "bucket name for the S3 cacher")
-	fs.BoolVar(&cfg.s3CacherOpts.forcePathStyle, "cacher-s3-force-path-style", false, "force path-style addressing for the S3 cacher")
-	fs.Int64Var(&cfg.s3CacherOpts.partSize, "cacher-s3-part-size", 100<<20, "multipart upload part size for the S3 cacher")
+	fs.StringVar(&cfg.s3CacherOpts.AccessKeyID, "cacher-s3-access-key-id", "", "access key ID for the S3 cacher")
+	fs.StringVar(&cfg.s3CacherOpts.SecretAccessKey, "cacher-s3-secret-access-key", "", "secret access key for the S3 cacher")
+	fs.StringVar(&cfg.s3CacherOpts.Endpoint, "cacher-s3-endpoint", "s3.amazonaws.com", "endpoint for the S3 cacher")
+	fs.BoolVar(&cfg.s3CacherOpts.Secure, "cacher-s3-enable-tls", false, "enable TLS for the S3 cacher")
+	fs.StringVar(&cfg.s3CacherOpts.Region, "cacher-s3-region", "us-east-1", "region for the S3 cacher")
+	fs.StringVar(&cfg.s3CacherOpts.Bucket, "cacher-s3-bucket", "", "bucket name for the S3 cacher")
+	fs.Int64Var(&cfg.s3CacherOpts.PartSize, "cacher-s3-part-size", 100<<20, "multipart upload part size for the S3 cacher")
 	fs.StringVar(&cfg.tempDir, "temp-dir", os.TempDir(), "directory for storing temporary files")
 	fs.BoolVar(&cfg.insecure, "insecure", false, "allow insecure TLS connections")
 	fs.BoolVar(&cfg.noFetch, "no-fetch", false, "only use local cache.")
@@ -110,11 +110,11 @@ func runServerCmd(cmd *cobra.Command, args []string, cfg *serverCmdConfig) error
 	}
 	switch cfg.cacher {
 	case "dir":
-		g.Cacher = goproxy.DirCacher(cfg.cacherDir)
+		g.Cacher = cache.DirCacher(cfg.cacherDir)
 	case "s3":
 		s3CacherOpts := cfg.s3CacherOpts
-		s3CacherOpts.transport = transport
-		s3c, err := newS3Cacher(s3CacherOpts)
+		s3CacherOpts.Transport = transport
+		s3c, err := cache.NewS3Cacher(s3CacherOpts)
 		if err != nil {
 			return err
 		}

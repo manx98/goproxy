@@ -3,6 +3,7 @@ package goproxy
 import (
 	"errors"
 	"fmt"
+	"github.com/goproxy/goproxy/utils"
 	"io/fs"
 	"net/http"
 	"strings"
@@ -23,7 +24,7 @@ func TestNewSumDBClientOps(t *testing.T) {
 		if tt.wantErr != nil {
 			if err == nil {
 				t.Fatalf("test(%d): expected error", tt.n)
-			} else if got, want := err, tt.wantErr; !compareErrors(got, want) {
+			} else if got, want := err, tt.wantErr; !utils.CompareErrors(got, want) {
 				t.Errorf("test(%d): got %q, want %q", tt.n, got, want)
 			}
 		} else {
@@ -110,7 +111,7 @@ func TestSumDBClientOpsURL(t *testing.T) {
 		if tt.wantErr != nil {
 			if err == nil {
 				t.Fatalf("test(%d): expected error", tt.n)
-			} else if got, want := err, tt.wantErr; !compareErrors(got, want) {
+			} else if got, want := err, tt.wantErr; !utils.CompareErrors(got, want) {
 				t.Errorf("test(%d): got %q, want %q", tt.n, got, want)
 			}
 		} else {
@@ -171,7 +172,7 @@ func TestSumDBClientOpsReadRemote(t *testing.T) {
 		if tt.wantErr != nil {
 			if err == nil {
 				t.Fatalf("test(%d): expected error", tt.n)
-			} else if got, want := err, tt.wantErr; !compareErrors(got, want) {
+			} else if got, want := err, tt.wantErr; !utils.CompareErrors(got, want) {
 				t.Errorf("test(%d): got %q, want %q", tt.n, got, want)
 			}
 		} else {
@@ -215,7 +216,7 @@ func TestSumDBClientOpsReadConfig(t *testing.T) {
 		if tt.wantErr != nil {
 			if err == nil {
 				t.Fatalf("test(%d): expected error", tt.n)
-			} else if got, want := err, tt.wantErr; !compareErrors(got, want) {
+			} else if got, want := err, tt.wantErr; !utils.CompareErrors(got, want) {
 				t.Errorf("test(%d): got %q, want %q", tt.n, got, want)
 			}
 		} else {
@@ -275,7 +276,7 @@ func TestSumDBClientOpsExtraCalls(t *testing.T) {
 		if tt.wantErr != nil {
 			if err == nil {
 				t.Fatalf("test(%d): expected error", tt.n)
-			} else if got, want := err, tt.wantErr; !compareErrors(got, want) {
+			} else if got, want := err, tt.wantErr; !utils.CompareErrors(got, want) {
 				t.Errorf("test(%d): got %q, want %q", tt.n, got, want)
 			}
 		} else {

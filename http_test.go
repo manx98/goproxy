@@ -6,6 +6,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"github.com/goproxy/goproxy/utils"
 	"io"
 	"io/fs"
 	"math/rand"
@@ -28,7 +29,7 @@ func TestNotExistError(t *testing.T) {
 		{2, notExistErrorf("foobar"), errors.New("foobar")},
 		{3, notExistErrorf("foobar"), fs.ErrNotExist},
 	} {
-		if got, want := tt.err, tt.wantErr; !compareErrors(got, want) {
+		if got, want := tt.err, tt.wantErr; !utils.CompareErrors(got, want) {
 			t.Errorf("test(%d): got %q, want %q", tt.n, got, want)
 		}
 	}
@@ -164,7 +165,7 @@ func TestHTTPGet(t *testing.T) {
 		if tt.wantErr != nil {
 			if err == nil {
 				t.Fatalf("test(%d): expected error", tt.n)
-			} else if got, want := err, tt.wantErr; !compareErrors(got, want) {
+			} else if got, want := err, tt.wantErr; !utils.CompareErrors(got, want) {
 				t.Errorf("test(%d): got %q, want %q", tt.n, got, want)
 			}
 		} else {
@@ -219,12 +220,12 @@ func TestHTTPGetTemp(t *testing.T) {
 		if tt.wantErr != nil {
 			if err == nil {
 				t.Fatalf("test(%d): expected error", tt.n)
-			} else if got, want := err, tt.wantErr; !compareErrors(got, want) {
+			} else if got, want := err, tt.wantErr; !utils.CompareErrors(got, want) {
 				t.Errorf("test(%d): got %q, want %q", tt.n, got, want)
 			}
 			if _, err := os.Stat(tempFile); err == nil {
 				t.Fatalf("test(%d): expected error", tt.n)
-			} else if got, want := err, fs.ErrNotExist; !compareErrors(got, want) {
+			} else if got, want := err, fs.ErrNotExist; !utils.CompareErrors(got, want) {
 				t.Errorf("test(%d): got %q, want %q", tt.n, got, want)
 			}
 		} else {

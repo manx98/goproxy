@@ -103,7 +103,7 @@ func responseError(rw http.ResponseWriter, req *http.Request, err error, cacheSe
 	if errors.Is(err, fs.ErrNotExist) {
 		cacheControlMaxAge := -1
 		msg := err.Error()
-		if err == fs.ErrNotExist {
+		if errors.Is(err, fs.ErrNotExist) {
 			msg = "not found"
 		}
 		if strings.Contains(msg, errBadUpstream.Error()) {

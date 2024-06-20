@@ -1,0 +1,34 @@
+package utils
+
+import (
+	"github.com/juju/errors"
+	"io"
+	"io/fs"
+)
+
+func CompareErrors(got, want error) bool {
+	if !errors.Is(want, fs.ErrNotExist) && errors.Is(want, fs.ErrNotExist) {
+		return errors.Is(got, fs.ErrNotExist) && got.Error() == want.Error()
+	}
+	return errors.Is(got, want) || got.Error() == want.Error()
+}
+
+type TestReadSeeker struct {
+	io.ReadSeeker
+	ReadF func(rs io.ReadSeeker, p []byte) (n int, err error)
+	seek  func(rs io.ReadSeeker, offset int64, whence int) (int64, error)
+}
+
+func (rs *TestReadSeeker) Read(p []byte) (n int, err error) {
+	if rs.ReadF != nil {
+		return rs.ReadF(rs.ReadSeeker, p)
+	}
+	return rs.ReadSeeker.Read(p)
+}
+
+func (rs *TestReadSeeker) Seek(offset int64, whence int) (int64, error) {
+	if rs.seek != nil {
+		return rs.seek(rs.ReadSeeker, offset, whence)
+	}
+	return rs.ReadSeeker.Seek(offset, whence)
+}

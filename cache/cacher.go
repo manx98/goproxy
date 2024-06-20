@@ -1,8 +1,10 @@
-package goproxy
+package cache
 
 import (
 	"context"
 	"fmt"
+	"github.com/goproxy/goproxy/obj"
+	"github.com/juju/errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -32,7 +34,7 @@ type Cacher interface {
 	// Put puts a cache for the name with the content.
 	Put(ctx context.Context, name string, content io.ReadSeeker) error
 
-	Walk(ctx context.Context, fn func(name string) (bool, error)) error
+	List(ctx context.Context, name string) ([]*obj.Dirent, error)
 }
 
 // DirCacher implements [Cacher] using a directory on the local disk. If the
@@ -82,22 +84,26 @@ func (dc DirCacher) Put(ctx context.Context, name string, content io.ReadSeeker)
 	return os.Rename(f.Name(), file)
 }
 
-func (dc DirCacher) Walk(ctx context.Context, fn func(name string) (bool, error)) error {
-	return filepath.Walk(string(dc), func(path string, info os.FileInfo, err error) error {
+func (dc DirCacher) List(ctx context.Context, name string) ([]*obj.Dirent, error) {
+	dirs, err := os.ReadDir(filepath.Join(string(dc), name))
+	if err != nil {
+		return nil, errors.Annotate(err, "read dir")
+	}
+	result := make([]*obj.Dirent, len(dirs))
+	for i, dir := range dirs {
+		info, err := dir.Info()
 		if err != nil {
-			return err
+			return nil, errors.Annotate(err, "get file info")
 		}
-		if info.IsDir() {
-			return nil
+		dirent := &obj.Dirent{
+			Name:  info.Name(),
+			Size:  info.Size(),
+			IsDir: info.IsDir(),
 		}
-		if path == string(dc) {
-			return nil
+		if !dirent.IsDir {
+			dirent.Mtime = info.ModTime().UnixMilli()
 		}
-		if ok, err := fn(filepath.ToSlash(path[len(string(dc))+1:])); err != nil {
-			return err
-		} else if !ok {
-			return filepath.SkipAll
-		}
-		return context.Cause(ctx)
-	})
+		result[i] = dirent
+	}
+	return result, nil
 }

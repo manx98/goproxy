@@ -5,25 +5,35 @@ import (
 	"github.com/juju/errors"
 	"go.etcd.io/bbolt"
 	"go.uber.org/zap"
-	"path/filepath"
+	"sync"
 )
 
 var (
-	bucketKey = []byte("BUCKET")
-	headKey   = []byte("HEAD")
+	checkPointKey = []byte("CPK")
+	cfgKey        = []byte("CFG")
+	headKey       = []byte("HD")
+	fsKey         = []byte("FS")
 )
 
-var db *bbolt.DB
+var (
+	db   *bbolt.DB
+	Lock sync.RWMutex
+)
 
-func initDb(dataPath string) {
+func InitDb(dataPath string) {
 	var err error
-	db, err = bbolt.Open(filepath.Join(dataPath, "data.db"), 0600, nil)
+	db, err = bbolt.Open(dataPath, 0600, nil)
 	if err != nil {
 		logger.Fatal("failed to create database", zap.Error(err))
 	}
 	err = db.Update(func(tx *bbolt.Tx) error {
-		_, err = tx.CreateBucketIfNotExists(bucketKey)
-		return err
+		for _, bk := range [][]byte{cfgKey, checkPointKey, fsKey} {
+			_, err = tx.CreateBucketIfNotExists(bk)
+			if err != nil {
+				return errors.Annotatef(err, "create bucket: %s", string(bk))
+			}
+		}
+		return nil
 	})
 	if err != nil {
 		logger.Fatal("failed to create bucket", zap.Error(err))
@@ -31,6 +41,13 @@ func initDb(dataPath string) {
 	return
 }
 
-func UpdateHead(tx *bbolt.Tx, id []byte) error {
-	return errors.Annotate(tx.Bucket(bucketKey).Put(headKey, id), "update head")
+func Update(f func(tx *bbolt.Tx) error) error {
+	return db.Update(f)
+}
+
+func Close() error {
+	if db != nil {
+		return db.Close()
+	}
+	return nil
 }
