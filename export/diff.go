@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -28,14 +29,22 @@ const (
 	DiffStatusDirDeleted = 'C'
 )
 
+type CreateCheckPointStatistic struct {
+	Dirs  atomic.Int64
+	Files atomic.Int64
+	Size  atomic.Int64
+	Msg   atomic.Value
+}
+
 type DiffCallback func(op OperateType, parent string, dirent *obj.Dirent) error
 
-func buildNewTree(bucket *bbolt.Bucket, ctx context.Context, cher cache.Cacher, name string) (id []byte, err error) {
+func buildNewTree(bucket *bbolt.Bucket, ctx context.Context, cher cache.Cacher, name string, st *CreateCheckPointStatistic) (id []byte, err error) {
 	dirent := new(obj.DirEntry)
 	dirent.Entries, err = cher.List(ctx, name)
 	if err != nil {
 		return nil, err
 	}
+	st.Dirs.Add(1)
 	if len(dirent.Entries) == 0 {
 		return EmptyId, nil
 	}
@@ -48,11 +57,13 @@ func buildNewTree(bucket *bbolt.Bucket, ctx context.Context, cher cache.Cacher, 
 		}
 		if info.IsDir {
 			info.Mtime = 0
-			info.Id, err = buildNewTree(bucket, ctx, cher, filepath.Join(name, info.Name))
+			info.Id, err = buildNewTree(bucket, ctx, cher, filepath.Join(name, info.Name), st)
 			if err != nil {
 				return
 			}
 		} else {
+			st.Files.Add(1)
+			st.Size.Add(info.Size)
 			info.ComputeId()
 		}
 	}
@@ -103,12 +114,12 @@ func SetHead(tx *bbolt.Tx, id []byte) error {
 	return nil
 }
 
-func BuildNewTree(tx *bbolt.Tx, ctx context.Context, cher cache.Cacher) ([]byte, error) {
+func BuildNewTree(tx *bbolt.Tx, ctx context.Context, cher cache.Cacher, st *CreateCheckPointStatistic) ([]byte, error) {
 	bucket := tx.Bucket(fsKey)
 	if bucket == nil {
 		return nil, errors.Errorf("bucket %s is missing", string(fsKey))
 	}
-	return buildNewTree(bucket, ctx, cher, "")
+	return buildNewTree(bucket, ctx, cher, "", st)
 }
 
 func GetDirEntry(tx *bbolt.Tx, id []byte) (*obj.DirEntry, error) {
@@ -130,7 +141,7 @@ func GetDirEntry(tx *bbolt.Tx, id []byte) (*obj.DirEntry, error) {
 	return info, nil
 }
 
-func CreateCheckPoint(tx *bbolt.Tx, ctx context.Context, desc string, cher cache.Cacher) ([]byte, error) {
+func CreateCheckPoint(tx *bbolt.Tx, ctx context.Context, desc string, cher cache.Cacher, st *CreateCheckPointStatistic) ([]byte, error) {
 	Lock.Lock()
 	defer Lock.Unlock()
 	head, err := GetHead(tx)
@@ -141,7 +152,7 @@ func CreateCheckPoint(tx *bbolt.Tx, ctx context.Context, desc string, cher cache
 		Parent: head.Id,
 		Desc:   desc,
 		Mtime:  time.Now().UnixMilli()}
-	newHeader.Id, err = BuildNewTree(tx, ctx, cher)
+	newHeader.Id, err = BuildNewTree(tx, ctx, cher, st)
 	if err != nil {
 		return nil, err
 	}
