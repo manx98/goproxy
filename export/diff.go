@@ -47,6 +47,7 @@ func buildNewTree(bucket *bbolt.Bucket, ctx context.Context, cher cache.Cacher, 
 			return nil, errors.Annotate(context.Cause(ctx), "walk dirent entry")
 		}
 		if info.IsDir {
+			info.Mtime = 0
 			info.Id, err = buildNewTree(bucket, ctx, cher, filepath.Join(name, info.Name))
 			if err != nil {
 				return

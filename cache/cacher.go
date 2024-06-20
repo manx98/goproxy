@@ -99,9 +99,7 @@ func (dc DirCacher) List(ctx context.Context, name string) ([]*obj.Dirent, error
 			Name:  info.Name(),
 			Size:  info.Size(),
 			IsDir: info.IsDir(),
-		}
-		if !dirent.IsDir {
-			dirent.Mtime = info.ModTime().UnixMilli()
+			Mtime: info.ModTime().UnixMilli(),
 		}
 		result[i] = dirent
 	}

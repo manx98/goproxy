@@ -137,9 +137,8 @@ func (s3c *S3Cacher) List(ctx context.Context, name string) ([]*obj.Dirent, erro
 		if info.LastModified.IsZero() {
 			dirent.Name = strings.Trim(dirent.Name, "/\\")
 			dirent.IsDir = true
-		} else {
-			dirent.Mtime = info.LastModified.UnixMilli()
 		}
+		dirent.Mtime = info.LastModified.UnixMilli()
 		result = append(result, dirent)
 	}
 	return result, nil
