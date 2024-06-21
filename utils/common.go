@@ -16,7 +16,7 @@ func CompareErrors(got, want error) bool {
 type TestReadSeeker struct {
 	io.ReadSeeker
 	ReadF func(rs io.ReadSeeker, p []byte) (n int, err error)
-	seek  func(rs io.ReadSeeker, offset int64, whence int) (int64, error)
+	SeekF func(rs io.ReadSeeker, offset int64, whence int) (int64, error)
 }
 
 func (rs *TestReadSeeker) Read(p []byte) (n int, err error) {
@@ -27,8 +27,8 @@ func (rs *TestReadSeeker) Read(p []byte) (n int, err error) {
 }
 
 func (rs *TestReadSeeker) Seek(offset int64, whence int) (int64, error) {
-	if rs.seek != nil {
-		return rs.seek(rs.ReadSeeker, offset, whence)
+	if rs.SeekF != nil {
+		return rs.SeekF(rs.ReadSeeker, offset, whence)
 	}
 	return rs.ReadSeeker.Seek(offset, whence)
 }

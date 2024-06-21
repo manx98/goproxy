@@ -1038,9 +1038,9 @@ func TestGoproxyServePutCache(t *testing.T) {
 		},
 		{
 			n: 2,
-			content: &testReadSeeker{
+			content: &utils.TestReadSeeker{
 				ReadSeeker: strings.NewReader("foobar"),
-				read: func(rs io.ReadSeeker, p []byte) (n int, err error) {
+				ReadF: func(rs io.ReadSeeker, p []byte) (n int, err error) {
 					return 0, errors.New("cannot read")
 				},
 			},
@@ -1049,9 +1049,9 @@ func TestGoproxyServePutCache(t *testing.T) {
 		},
 		{
 			n: 3,
-			content: &testReadSeeker{
+			content: &utils.TestReadSeeker{
 				ReadSeeker: strings.NewReader("foobar"),
-				seek: func(rs io.ReadSeeker, offset int64, whence int) (int64, error) {
+				SeekF: func(rs io.ReadSeeker, offset int64, whence int) (int64, error) {
 					return 0, errors.New("cannot seek")
 				},
 			},

@@ -5,15 +5,16 @@ import (
 	"context"
 	"crypto/sha1"
 	"encoding/hex"
+	"fmt"
 	"github.com/goproxy/goproxy/cache"
 	"github.com/goproxy/goproxy/obj"
 	"github.com/juju/errors"
 	"go.etcd.io/bbolt"
 	"google.golang.org/protobuf/proto"
+	"io"
 	"path/filepath"
 	"slices"
 	"strings"
-	"sync/atomic"
 	"time"
 )
 
@@ -22,29 +23,63 @@ var EmptyId = make([]byte, sha1.Size)
 type OperateType rune
 
 const (
-	DiffStatusAdded      = 'A'
-	DiffStatusDeleted    = 'D'
-	DiffStatusModified   = 'M'
-	DiffStatusDirAdded   = 'B'
-	DiffStatusDirDeleted = 'C'
+	DiffStatusAdded    OperateType = 'A'
+	DiffStatusDeleted  OperateType = 'D'
+	DiffStatusModified OperateType = 'M'
 )
 
-type CreateCheckPointStatistic struct {
-	Dirs  atomic.Int64
-	Files atomic.Int64
-	Size  atomic.Int64
-	Msg   atomic.Value
+const (
+	DirAddUpdated  byte = 'D'
+	SizeAddUpdated byte = 'S'
+	StatusUpdated  byte = 'M'
+	BinaryWrite    byte = 'W'
+)
+
+type CreateCheckPointWatcher struct {
+	io.Writer
+}
+
+func (s *CreateCheckPointWatcher) AddDir(num int64) (err error) {
+	if s.Write != nil {
+		_, err = fmt.Fprintf(s, "%c%d", DirAddUpdated, num)
+		if err != nil {
+			return errors.Annotate(err, "write dir add")
+		}
+	}
+	return nil
+}
+
+func (s *CreateCheckPointWatcher) AddSize(size int64) (err error) {
+	if s.Write != nil {
+		_, err = fmt.Fprintf(s, "%c%d", SizeAddUpdated, size)
+		if err != nil {
+			return errors.Annotate(err, "add file size")
+		}
+	}
+	return nil
+}
+
+func (s *CreateCheckPointWatcher) Finished(msg string) (err error) {
+	if s.Write != nil {
+		_, err = fmt.Fprintf(s, "%c%s", StatusUpdated, msg)
+		if err != nil {
+			return errors.Annotate(err, "update msg")
+		}
+	}
+	return nil
 }
 
 type DiffCallback func(op OperateType, parent string, dirent *obj.Dirent) error
 
-func buildNewTree(bucket *bbolt.Bucket, ctx context.Context, cher cache.Cacher, name string, st *CreateCheckPointStatistic) (id []byte, err error) {
+func buildNewTree(bucket *bbolt.Bucket, ctx context.Context, cher cache.Cacher, name string, st *CreateCheckPointWatcher) (id []byte, err error) {
 	dirent := new(obj.DirEntry)
 	dirent.Entries, err = cher.List(ctx, name)
 	if err != nil {
 		return nil, err
 	}
-	st.Dirs.Add(1)
+	if err = st.AddDir(1); err != nil {
+		return nil, err
+	}
 	if len(dirent.Entries) == 0 {
 		return EmptyId, nil
 	}
@@ -62,8 +97,9 @@ func buildNewTree(bucket *bbolt.Bucket, ctx context.Context, cher cache.Cacher, 
 				return
 			}
 		} else {
-			st.Files.Add(1)
-			st.Size.Add(info.Size)
+			if err = st.AddSize(info.Size); err != nil {
+				return nil, err
+			}
 			info.ComputeId()
 		}
 	}
@@ -114,7 +150,7 @@ func SetHead(tx *bbolt.Tx, id []byte) error {
 	return nil
 }
 
-func BuildNewTree(tx *bbolt.Tx, ctx context.Context, cher cache.Cacher, st *CreateCheckPointStatistic) ([]byte, error) {
+func BuildNewTree(tx *bbolt.Tx, ctx context.Context, cher cache.Cacher, st *CreateCheckPointWatcher) ([]byte, error) {
 	bucket := tx.Bucket(fsKey)
 	if bucket == nil {
 		return nil, errors.Errorf("bucket %s is missing", string(fsKey))
@@ -141,7 +177,7 @@ func GetDirEntry(tx *bbolt.Tx, id []byte) (*obj.DirEntry, error) {
 	return info, nil
 }
 
-func CreateCheckPoint(tx *bbolt.Tx, ctx context.Context, desc string, cher cache.Cacher, st *CreateCheckPointStatistic) ([]byte, error) {
+func CreateCheckPoint(tx *bbolt.Tx, ctx context.Context, desc string, cher cache.Cacher, st *CreateCheckPointWatcher) ([]byte, error) {
 	Lock.Lock()
 	defer Lock.Unlock()
 	head, err := GetHead(tx)
@@ -330,7 +366,7 @@ func twoWayDiffDirs(baseDir string, dents []*obj.Dirent, opt *DiffOpt, recurse *
 	if p1 == nil {
 		if bytes.Equal(EmptyId, p2.Id) || opt.FoldDirDiff {
 			*recurse = false
-			return opt.Callback(DiffStatusDirAdded, baseDir, p2)
+			return opt.Callback(DiffStatusAdded, baseDir, p2)
 		} else {
 			*recurse = true
 		}
@@ -343,7 +379,7 @@ func twoWayDiffDirs(baseDir string, dents []*obj.Dirent, opt *DiffOpt, recurse *
 		} else {
 			*recurse = true
 		}
-		return opt.Callback(DiffStatusDirDeleted, baseDir, p1)
+		return opt.Callback(DiffStatusDeleted, baseDir, p1)
 	}
 
 	return nil
@@ -361,4 +397,20 @@ func DiffTrees(tx *bbolt.Tx, oldRoot, newRoot []byte, opt *DiffOpt) (err error) 
 		err = diffTreesRecursive(trees, "", opt)
 	}
 	return
+}
+
+func DiffHead(tx *bbolt.Tx, oldRoot []byte, chr cache.Cacher, st *CreateCheckPointWatcher, opt *DiffOpt) error {
+	defer tx.Rollback()
+	treeRoot, err := BuildNewTree(tx, opt.Ctx, chr, st)
+	if err != nil {
+		return st.Finished("Error: " + err.Error())
+	}
+	if err = st.Finished(""); err != nil {
+		return err
+	}
+	err = DiffTrees(tx, oldRoot, treeRoot, opt)
+	if err != nil {
+		return err
+	}
+	return nil
 }
