@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/goproxy/goproxy/cache"
+	"github.com/goproxy/goproxy/web"
 	"net"
 	"net/http"
 	"os"
@@ -122,9 +123,12 @@ func runServerCmd(cmd *cobra.Command, args []string, cfg *serverCmdConfig) error
 	default:
 		return fmt.Errorf("invalid --cacher: %q", cfg.cacher)
 	}
-
+	mux := http.NewServeMux()
+	web.Init(mux, g)
 	handler := http.Handler(g)
+	proxyPrefix := "/"
 	if cfg.pathPrefix != "" {
+		proxyPrefix = cfg.pathPrefix
 		handler = http.StripPrefix(cfg.pathPrefix, handler)
 	}
 	if cfg.fetchTimeout > 0 {
@@ -136,10 +140,10 @@ func runServerCmd(cmd *cobra.Command, args []string, cfg *serverCmdConfig) error
 			})
 		}(handler)
 	}
-
+	mux.Handle(proxyPrefix, handler)
 	server := &http.Server{
 		Addr:        cfg.address,
-		Handler:     handler,
+		Handler:     mux,
 		BaseContext: func(_ net.Listener) context.Context { return cmd.Context() },
 	}
 	stopCtx, stop := signal.NotifyContext(cmd.Context(), syscall.SIGINT, syscall.SIGTERM)

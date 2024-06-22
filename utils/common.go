@@ -4,6 +4,7 @@ import (
 	"github.com/juju/errors"
 	"io"
 	"io/fs"
+	"reflect"
 )
 
 func CompareErrors(got, want error) bool {
@@ -31,4 +32,12 @@ func (rs *TestReadSeeker) Seek(offset int64, whence int) (int64, error) {
 		return rs.SeekF(rs.ReadSeeker, offset, whence)
 	}
 	return rs.ReadSeeker.Seek(offset, whence)
+}
+
+func IsNil(i interface{}) bool {
+	if i == nil {
+		return true
+	}
+	vi := reflect.ValueOf(i)
+	return vi.Kind() == reflect.Ptr && vi.IsNil()
 }

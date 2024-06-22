@@ -8,7 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/goproxy/goproxy/cache"
-	"github.com/goproxy/goproxy/export"
+	"github.com/goproxy/goproxy/db"
 	"github.com/goproxy/goproxy/logger"
 	"go.uber.org/zap"
 	"io"
@@ -132,12 +132,12 @@ func (g *Goproxy) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 // serveFetch serves fetch requests.
 func (g *Goproxy) serveFetch(rw http.ResponseWriter, req *http.Request, target string) {
-	if !export.Lock.TryRLock() {
+	if !db.Lock.TryRLock() {
 		logger.Warn("The current request will be rejected because the export operation is running.", zap.String("method", req.Method), zap.String("URL", req.URL.String()))
 		responseInternalServerError(rw, req)
 		return
 	}
-	defer export.Lock.RUnlock()
+	defer db.Lock.RUnlock()
 	escapedModulePath, after, ok := strings.Cut(target, "/@")
 	if !ok {
 		responseNotFound(rw, req, 86400, "missing /@v/")

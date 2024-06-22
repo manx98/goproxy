@@ -38,7 +38,7 @@ func (e *notExistError) Error() string { return e.err.Error() }
 func (e *notExistError) Unwrap() error { return e.err }
 
 // Is reports whether the target is [fs.ErrNotExist].
-func (notExistError) Is(target error) bool { return target == fs.ErrNotExist }
+func (notExistError) Is(target error) bool { return errors.Is(target, fs.ErrNotExist) }
 
 // notExistErrorf formats according to a format specifier and returns the string
 // as a value that satisfies error that is equivalent to [fs.ErrNotExist].

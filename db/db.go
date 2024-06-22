@@ -1,18 +1,14 @@
-package export
+package db
 
 import (
+	"bytes"
+	"github.com/goproxy/goproxy/constant"
+	"github.com/goproxy/goproxy/export"
 	"github.com/goproxy/goproxy/logger"
 	"github.com/juju/errors"
 	"go.etcd.io/bbolt"
 	"go.uber.org/zap"
 	"sync"
-)
-
-var (
-	checkPointKey = []byte("CPK")
-	cfgKey        = []byte("CFG")
-	headKey       = []byte("HD")
-	fsKey         = []byte("FS")
 )
 
 var (
@@ -27,10 +23,20 @@ func InitDb(dataPath string) {
 		logger.Fatal("failed to create database", zap.Error(err))
 	}
 	err = db.Update(func(tx *bbolt.Tx) error {
-		for _, bk := range [][]byte{cfgKey, checkPointKey, fsKey} {
-			_, err = tx.CreateBucketIfNotExists(bk)
+		var bkt *bbolt.Bucket
+		for _, bk := range [][]byte{constant.Cfg, constant.CheckPoint, constant.FS} {
+			bkt, err = tx.CreateBucketIfNotExists(bk)
 			if err != nil {
 				return errors.Annotatef(err, "create bucket: %s", string(bk))
+			}
+			if bytes.Equal(bk, constant.Cfg) {
+				if bkt.Get(constant.Head) == nil {
+					logger.Debug("header is missing, will set be empty header id")
+					err = bkt.Put(constant.Head, export.EmptyId)
+					if err != nil {
+						return errors.Annotate(err, "put empty root ID to header")
+					}
+				}
 			}
 		}
 		return nil
@@ -43,6 +49,10 @@ func InitDb(dataPath string) {
 
 func Update(f func(tx *bbolt.Tx) error) error {
 	return db.Update(f)
+}
+
+func View(f func(tx *bbolt.Tx) error) error {
+	return db.View(f)
 }
 
 func Close() error {
