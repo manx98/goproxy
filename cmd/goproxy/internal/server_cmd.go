@@ -103,17 +103,28 @@ func runServerCmd(cmd *cobra.Command, args []string, cfg *serverCmdConfig) error
 	transport.DialContext = (&net.Dialer{Timeout: cfg.connectTimeout, KeepAlive: 30 * time.Second}).DialContext
 	transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: cfg.insecure}
 	transport.RegisterProtocol("file", http.NewFileTransport(httpDirFS{}))
+	tmpDir := filepath.Join(cfg.dataDir, constant.CacheDir)
 	g := &goproxy.Goproxy{
 		Fetcher: &goproxy.GoFetcher{
 			GoBin:            cfg.goBin,
 			MaxDirectFetches: cfg.maxDirectFetches,
-			TempDir:          filepath.Join(cfg.dataDir, constant.CacheDir),
+			TempDir:          tmpDir,
 			Transport:        transport,
 		},
 		ProxiedSumDBs: cfg.proxiedSumDBs,
-		TempDir:       cfg.dataDir,
+		TempDir:       tmpDir,
 		Transport:     transport,
 		NoFetch:       cfg.noFetch,
+	}
+	if cfg.goBin == "" {
+		g.GoBin = "go"
+	} else {
+		g.GoBin = cfg.goBin
+	}
+	if cfg.tlsCertFile != "" && cfg.tlsKeyFile != "" {
+		g.Address = "https://" + cfg.address + cfg.pathPrefix
+	} else {
+		g.Address = "http://" + cfg.address + cfg.pathPrefix
 	}
 	switch cfg.cacher {
 	case "dir":

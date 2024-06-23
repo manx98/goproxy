@@ -14,3 +14,8 @@ const (
 	CacheDir   = "tmp"
 	DbFileName = "db.bbolt"
 )
+
+const (
+	Stderr = 'E'
+	Stdout = 'O'
+)

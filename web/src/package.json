@@ -1,5 +1,5 @@
 {
-  "name": "element-plus-vite-starter",
+  "name": "go-proxy-web",
   "private": true,
   "version": "0.1.0",
   "scripts": {
@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "element-plus": "^2.6.2",
+    "qs": "^6.12.1",
+    "streamsaver": "^2.0.6",
     "vue": "^3.4.21",
     "vue-router": "4"
   },

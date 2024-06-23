@@ -1,18 +1,31 @@
+const DirAddUpdated = 68;
+const SizeAddUpdated = 83;
+const StatusUpdated = 77;
+const BinaryWrite = 87;
+
 export class Fetcher {
     constructor(reader) {
         this.reader = reader;
         this.done = false;
         this.value = new Uint8Array(0);
+        this.onDirAddUpdated = (val) => {
+        }
+        this.onSizeAddUpdated = (val) => {
+        }
+        this.onStatusUpdated = (val) => {
+        }
+        this.onBinaryWrite = (val) => {
+        }
     }
 
     async nextBlock() {
         if (this.done) {
             throw new Error('Already done');
         }
-        let {value, done} = await this.reader.read();
-        this.done = done;
-        if(!done) {
-            this.value = value;
+        let data = await this.reader.read();
+        this.done = data.done;
+        if (!data.done) {
+            this.value = data.value;
         }
     }
 
@@ -60,6 +73,28 @@ export class Fetcher {
             return new TextDecoder().decode(data);
         }
     }
+
+    async run() {
+        while (true) {
+            let t = await this.readByte();
+            switch (t) {
+                case DirAddUpdated:
+                    this.onDirAddUpdated(await this.readInt64());
+                    break;
+                case SizeAddUpdated:
+                    this.onSizeAddUpdated(await this.readInt64());
+                    break;
+                case StatusUpdated:
+                    this.onStatusUpdated(await this.readString());
+                    return;
+                case BinaryWrite:
+                    this.onBinaryWrite(await this.readBytes());
+                    break;
+                default:
+                    throw new Error(`Unknown type ${t}`);
+            }
+        }
+    }
 }
 
 export async function Fetch(url, method = 'GET') {
@@ -71,4 +106,16 @@ export async function Fetch(url, method = 'GET') {
     } else {
         throw new Error(`HTTP error! status: ${response.status}`);
     }
+}
+
+export function formatBytes(bytes, decimals = 2) {
+    if (bytes === undefined || bytes === 0) return '0B';
+
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + sizes[i];
 }

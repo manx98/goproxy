@@ -69,12 +69,13 @@ type Goproxy struct {
 	// If Transport is nil, [http.DefaultTransport] is used.
 	Transport http.RoundTripper
 
-	NoFetch bool
-
+	NoFetch       bool
+	Address       string
 	initOnce      sync.Once
 	fetcher       Fetcher
 	proxiedSumDBs map[string]*url.URL
 	httpClient    *http.Client
+	GoBin         string
 }
 
 // init initializes the g.

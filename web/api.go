@@ -12,6 +12,7 @@ import (
 	"go.etcd.io/bbolt"
 	"go.uber.org/zap"
 	"net/http"
+	"path/filepath"
 	"strconv"
 )
 
@@ -22,6 +23,10 @@ func initApi(mux *http.ServeMux, p *goproxy.Goproxy) {
 	})
 	mux.HandleFunc("/api/create_checkpoint", func(writer http.ResponseWriter, request *http.Request) {
 		createCheckpoint(writer, request, p)
+	})
+	tool := NewGoTool(p.GoBin, p.Address, filepath.Join(p.TempDir, "gopath"))
+	mux.HandleFunc("/api/download_mod", func(writer http.ResponseWriter, request *http.Request) {
+		downloadMod(writer, request, tool)
 	})
 }
 
@@ -124,7 +129,6 @@ func downloadDiff(w http.ResponseWriter, r *http.Request, g *goproxy.Goproxy) {
 }
 
 func createCheckpoint(w http.ResponseWriter, r *http.Request, g *goproxy.Goproxy) {
-	w.WriteHeader(200)
 	st := export.NewCreateCheckPointWatcher(w)
 	var id []byte
 	err := db.Update(func(tx *bbolt.Tx) (err error) {
@@ -146,4 +150,9 @@ func createCheckpoint(w http.ResponseWriter, r *http.Request, g *goproxy.Goproxy
 			logger.Warn("failed to finish create checkpoint", zap.Error(err))
 		}
 	}
+}
+
+func downloadMod(w http.ResponseWriter, r *http.Request, f *GoTool) {
+	name := r.URL.Query().Get("q")
+	f.Get(w, name)
 }
