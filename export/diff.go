@@ -80,7 +80,7 @@ func (s *StreamDataWriter) Write(data []byte) (n int, err error) {
 		dataPackage[0] = BinaryWrite
 		binary.BigEndian.PutUint64(dataPackage[1:], uint64(len(data)))
 		copy(dataPackage[9:], data)
-		n, err = s.w.Write(data)
+		n, err = s.w.Write(dataPackage)
 		if err != nil {
 			return 0, errors.Annotate(err, "write binary")
 		}

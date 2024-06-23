@@ -8,6 +8,7 @@ import (
 	"github.com/goproxy/goproxy/export"
 	"github.com/goproxy/goproxy/logger"
 	"github.com/goproxy/goproxy/obj"
+	"github.com/juju/errors"
 	"go.etcd.io/bbolt"
 	"go.uber.org/zap"
 	"net/http"
@@ -125,10 +126,16 @@ func downloadDiff(w http.ResponseWriter, r *http.Request, g *goproxy.Goproxy) {
 func createCheckpoint(w http.ResponseWriter, r *http.Request, g *goproxy.Goproxy) {
 	w.WriteHeader(200)
 	st := export.NewCreateCheckPointWatcher(w)
+	var id []byte
 	err := db.Update(func(tx *bbolt.Tx) (err error) {
-		_, err = export.CreateCheckPoint(tx, r.Context(), r.URL.Query().Get("desc"), g.Cacher, st)
+		id, err = export.CreateCheckPoint(tx, r.Context(), r.URL.Query().Get("desc"), g.Cacher, st)
 		return
 	})
+	if err == nil {
+		if _, err = st.Write(id); err != nil {
+			err = errors.Annotate(err, "write head id")
+		}
+	}
 	if err != nil {
 		logger.Warn("failed to create checkpoint", zap.Error(err))
 		if err1 := st.Close(err.Error()); err1 != nil {
