@@ -1,3 +1,3 @@
 package web
 
-//go:generate
+//go:generate sh build.sh

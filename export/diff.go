@@ -3,10 +3,8 @@ package export
 import (
 	"bytes"
 	"context"
-	"crypto/sha1"
 	"encoding/binary"
 	"encoding/hex"
-	"fmt"
 	"github.com/goproxy/goproxy/cache"
 	"github.com/goproxy/goproxy/constant"
 	"github.com/goproxy/goproxy/db"
@@ -16,12 +14,11 @@ import (
 	"go.etcd.io/bbolt"
 	"google.golang.org/protobuf/proto"
 	"io"
+	"net/http"
 	"slices"
 	"strings"
 	"time"
 )
-
-var EmptyId = make([]byte, sha1.Size)
 
 type OperateType rune
 
@@ -45,33 +42,16 @@ func direntCompareFunc(a, b *obj.Dirent) int {
 type StreamDataWriter struct {
 	w         io.Writer
 	available bool
-}
-
-func (s *StreamDataWriter) writeByte(value byte) (err error) {
-	_, err = s.w.Write([]byte{value})
-	if err != nil {
-		return errors.Annotate(err, "write byte")
-	}
-	return nil
-}
-
-func (s *StreamDataWriter) writeInt64(value int64) error {
-	data := make([]byte, 8)
-	binary.BigEndian.PutUint64(data, uint64(value))
-	_, err := s.w.Write(data)
-	if err != nil {
-		return errors.Annotate(err, "write int64")
-	}
-	return nil
+	flush     func()
 }
 
 func (s *StreamDataWriter) AddDir(num int64) (err error) {
 	if s.available {
-		err = s.writeByte(DirAddUpdated)
-		if err != nil {
-			return errors.Annotate(err, "write data type")
-		}
-		err = s.writeInt64(num)
+		defer s.flush()
+		data := make([]byte, 9)
+		data[0] = DirAddUpdated
+		binary.BigEndian.PutUint64(data[1:], uint64(num))
+		_, err = s.w.Write(data)
 		if err != nil {
 			return errors.Annotate(err, "write dir num")
 		}
@@ -81,11 +61,11 @@ func (s *StreamDataWriter) AddDir(num int64) (err error) {
 
 func (s *StreamDataWriter) AddSize(size int64) (err error) {
 	if s.available {
-		err = s.writeByte(SizeAddUpdated)
-		if err != nil {
-			return errors.Annotate(err, "write data type")
-		}
-		err = s.writeInt64(size)
+		defer s.flush()
+		data := make([]byte, 9)
+		data[0] = SizeAddUpdated
+		binary.BigEndian.PutUint64(data[1:], uint64(size))
+		_, err = s.w.Write(data)
 		if err != nil {
 			return errors.Annotate(err, "write file size")
 		}
@@ -95,46 +75,48 @@ func (s *StreamDataWriter) AddSize(size int64) (err error) {
 
 func (s *StreamDataWriter) Write(data []byte) (n int, err error) {
 	if s.available {
-		err = s.writeByte(BinaryWrite)
-		if err != nil {
-			return 0, errors.Annotate(err, "write data type")
-		}
-		err = s.writeInt64(int64(len(data)))
-		if err != nil {
-			return 0, errors.Annotate(err, "write binary size")
-		}
+		defer s.flush()
+		dataPackage := make([]byte, len(data)+9)
+		dataPackage[0] = BinaryWrite
+		binary.BigEndian.PutUint64(dataPackage[1:], uint64(len(data)))
+		copy(dataPackage[9:], data)
 		n, err = s.w.Write(data)
 		if err != nil {
-			return 0, errors.Annotate(err, "write binary content")
+			return 0, errors.Annotate(err, "write binary")
 		}
 	}
 	return len(data), nil
 }
 
-func (s *StreamDataWriter) Finished(msg string) (err error) {
+func (s *StreamDataWriter) Close(msg string) (err error) {
 	if s.available {
-		_, err = fmt.Fprintf(s.w, "%c%s", StatusUpdated, msg)
-		err = s.writeByte(StatusUpdated)
+		defer s.flush()
+		data := make([]byte, len(msg)+9)
+		data[0] = StatusUpdated
+		binary.BigEndian.PutUint64(data[1:], uint64(len(msg)))
+		copy(data[9:], msg)
+		_, err = s.w.Write(data)
 		if err != nil {
-			return errors.Annotate(err, "write data type")
-		}
-		err = s.writeInt64(int64(len(msg)))
-		if err != nil {
-			return errors.Annotate(err, "write msg length")
-		}
-		_, err = s.w.Write([]byte(msg))
-		if err != nil {
-			return errors.Annotate(err, "write msg content")
+			return errors.Annotate(err, "write msg")
 		}
 	}
 	return nil
 }
 
-func NewCreateCheckPointWatcher(writer io.Writer) *StreamDataWriter {
-	return &StreamDataWriter{
+func NewCreateCheckPointWatcher(writer http.ResponseWriter) *StreamDataWriter {
+	w := &StreamDataWriter{
 		w:         writer,
 		available: !utils.IsNil(writer),
 	}
+	flusher, ok := writer.(http.Flusher)
+	if ok {
+		w.flush = flusher.Flush
+	} else {
+		w.flush = func() {
+
+		}
+	}
+	return w
 }
 
 type DiffCallback func(op OperateType, parent string, dirent *obj.Dirent) error
@@ -149,7 +131,7 @@ func buildNewTree(bucket *bbolt.Bucket, ctx context.Context, cher cache.Cacher, 
 		return nil, err
 	}
 	if len(dirent.Entries) == 0 {
-		return EmptyId, nil
+		return constant.EmptyId, nil
 	}
 	slices.SortFunc(dirent.Entries, direntCompareFunc)
 	for _, info := range dirent.Entries {
@@ -180,7 +162,7 @@ func GetCheckPoint(tx *bbolt.Tx, id []byte) (*obj.CheckPoint, error) {
 	if id == nil {
 		return nil, errors.Errorf("CheckPoint id is nil")
 	}
-	if bytes.Equal(id, EmptyId) {
+	if bytes.Equal(id, constant.EmptyId) {
 		return nil, nil
 	}
 	bucket := tx.Bucket(constant.CheckPoint)
@@ -191,7 +173,7 @@ func GetCheckPoint(tx *bbolt.Tx, id []byte) (*obj.CheckPoint, error) {
 	if data == nil {
 		return nil, errors.Errorf("checkponit %s data is missing", hex.EncodeToString(data))
 	}
-	info := &obj.CheckPoint{Parent: EmptyId, Id: EmptyId}
+	info := &obj.CheckPoint{Parent: constant.EmptyId, Id: constant.EmptyId}
 	err := proto.Unmarshal(data, info)
 	if err != nil {
 		return nil, errors.Annotatef(err, "unmarshal checkpoint %s data", hex.EncodeToString(data))
@@ -231,8 +213,8 @@ func BuildNewTree(tx *bbolt.Tx, ctx context.Context, cher cache.Cacher, st *Stre
 }
 
 func GetDirEntry(tx *bbolt.Tx, id []byte) (*obj.DirEntry, error) {
-	info := &obj.DirEntry{Id: EmptyId}
-	if bytes.Equal(id, EmptyId) {
+	info := &obj.DirEntry{Id: constant.EmptyId}
+	if bytes.Equal(id, constant.EmptyId) {
 		return info, nil
 	}
 	bucket := tx.Bucket(constant.FS)
@@ -257,10 +239,10 @@ func CreateCheckPoint(tx *bbolt.Tx, ctx context.Context, desc string, cher cache
 		return nil, err
 	}
 	newHeader := &obj.CheckPoint{
-		Parent: EmptyId,
+		Parent: constant.EmptyId,
 		Desc:   desc,
 		Mtime:  time.Now().UnixMilli()}
-	if head == nil {
+	if head != nil {
 		newHeader.Parent = head.Id
 	}
 	newHeader.Id, err = BuildNewTree(tx, ctx, cher, st)

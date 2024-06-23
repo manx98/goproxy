@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/goproxy/goproxy/cache"
+	"github.com/goproxy/goproxy/constant"
+	"github.com/goproxy/goproxy/db"
 	"github.com/goproxy/goproxy/web"
 	"net"
 	"net/http"
@@ -54,7 +56,7 @@ type serverCmdConfig struct {
 	cacher           string
 	cacherDir        string
 	s3CacherOpts     cache.S3CacherOptions
-	tempDir          string
+	dataDir          string
 	insecure         bool
 	connectTimeout   time.Duration
 	fetchTimeout     time.Duration
@@ -82,7 +84,7 @@ func newServerCmdConfig(cmd *cobra.Command) *serverCmdConfig {
 	fs.StringVar(&cfg.s3CacherOpts.Region, "cacher-s3-region", "us-east-1", "region for the S3 cacher")
 	fs.StringVar(&cfg.s3CacherOpts.Bucket, "cacher-s3-bucket", "", "bucket name for the S3 cacher")
 	fs.Int64Var(&cfg.s3CacherOpts.PartSize, "cacher-s3-part-size", 100<<20, "multipart upload part size for the S3 cacher")
-	fs.StringVar(&cfg.tempDir, "temp-dir", os.TempDir(), "directory for storing temporary files")
+	fs.StringVar(&cfg.dataDir, "data-dir", "data-dir", "directory for storing temporary files and databases file")
 	fs.BoolVar(&cfg.insecure, "insecure", false, "allow insecure TLS connections")
 	fs.BoolVar(&cfg.noFetch, "no-fetch", false, "only use local cache.")
 	fs.DurationVar(&cfg.connectTimeout, "connect-timeout", 30*time.Second, "maximum amount of time (0 means no limit) will wait for an outgoing connection to establish")
@@ -93,6 +95,10 @@ func newServerCmdConfig(cmd *cobra.Command) *serverCmdConfig {
 
 // runServerCmd runs the server command.
 func runServerCmd(cmd *cobra.Command, args []string, cfg *serverCmdConfig) error {
+	if err := os.MkdirAll(cfg.dataDir, 0755); err != nil {
+		return fmt.Errorf("failed to create data dir: %w", err)
+	}
+	db.InitDb(filepath.Join(cfg.dataDir, constant.DbFileName))
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.DialContext = (&net.Dialer{Timeout: cfg.connectTimeout, KeepAlive: 30 * time.Second}).DialContext
 	transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: cfg.insecure}
@@ -101,11 +107,11 @@ func runServerCmd(cmd *cobra.Command, args []string, cfg *serverCmdConfig) error
 		Fetcher: &goproxy.GoFetcher{
 			GoBin:            cfg.goBin,
 			MaxDirectFetches: cfg.maxDirectFetches,
-			TempDir:          cfg.tempDir,
+			TempDir:          filepath.Join(cfg.dataDir, constant.CacheDir),
 			Transport:        transport,
 		},
 		ProxiedSumDBs: cfg.proxiedSumDBs,
-		TempDir:       cfg.tempDir,
+		TempDir:       cfg.dataDir,
 		Transport:     transport,
 		NoFetch:       cfg.noFetch,
 	}

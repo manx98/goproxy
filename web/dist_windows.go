@@ -1,3 +1,3 @@
 package web
 
-//go:generate cmd
+//go:generate cmd /C build.bat

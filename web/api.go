@@ -3,6 +3,7 @@ package web
 import (
 	"encoding/base64"
 	"github.com/goproxy/goproxy"
+	"github.com/goproxy/goproxy/constant"
 	"github.com/goproxy/goproxy/db"
 	"github.com/goproxy/goproxy/export"
 	"github.com/goproxy/goproxy/logger"
@@ -84,7 +85,7 @@ func downloadDiff(w http.ResponseWriter, r *http.Request, g *goproxy.Goproxy) {
 	query := r.URL.Query()
 	idStr := query.Get("id")
 	logger.Debug("start download diff", zap.String("id", idStr), requestIdLog)
-	id := export.EmptyId
+	id := constant.EmptyId
 	st := export.NewCreateCheckPointWatcher(w)
 	err := db.View(func(tx *bbolt.Tx) (err error) {
 		if idStr == "" {
@@ -111,28 +112,30 @@ func downloadDiff(w http.ResponseWriter, r *http.Request, g *goproxy.Goproxy) {
 		return zipper.DiffHead(r.Context(), tx, id)
 	})
 	if err != nil {
-		if err1 := st.Finished(err.Error()); err1 != nil {
+		if err1 := st.Close(err.Error()); err1 != nil {
 			logger.Warn("failed to finish download diff with error", requestIdLog, zap.NamedError("occur_error", err), zap.Error(err1))
 		}
 	} else {
-		if err = st.Finished(""); err != nil {
+		if err = st.Close(""); err != nil {
 			logger.Warn("failed to finish download diff", requestIdLog, zap.Error(err))
 		}
 	}
 }
 
 func createCheckpoint(w http.ResponseWriter, r *http.Request, g *goproxy.Goproxy) {
+	w.WriteHeader(200)
 	st := export.NewCreateCheckPointWatcher(w)
-	err := db.View(func(tx *bbolt.Tx) (err error) {
+	err := db.Update(func(tx *bbolt.Tx) (err error) {
 		_, err = export.CreateCheckPoint(tx, r.Context(), r.URL.Query().Get("desc"), g.Cacher, st)
 		return
 	})
 	if err != nil {
-		if err1 := st.Finished(err.Error()); err1 != nil {
+		logger.Warn("failed to create checkpoint", zap.Error(err))
+		if err1 := st.Close(err.Error()); err1 != nil {
 			logger.Warn("failed to finish create checkpoint with error", zap.NamedError("occur_error", err), zap.Error(err1))
 		}
 	} else {
-		if err = st.Finished(""); err != nil {
+		if err = st.Close(""); err != nil {
 			logger.Warn("failed to finish create checkpoint", zap.Error(err))
 		}
 	}

@@ -3,7 +3,6 @@ package db
 import (
 	"bytes"
 	"github.com/goproxy/goproxy/constant"
-	"github.com/goproxy/goproxy/export"
 	"github.com/goproxy/goproxy/logger"
 	"github.com/juju/errors"
 	"go.etcd.io/bbolt"
@@ -32,7 +31,7 @@ func InitDb(dataPath string) {
 			if bytes.Equal(bk, constant.Cfg) {
 				if bkt.Get(constant.Head) == nil {
 					logger.Debug("header is missing, will set be empty header id")
-					err = bkt.Put(constant.Head, export.EmptyId)
+					err = bkt.Put(constant.Head, constant.EmptyId)
 					if err != nil {
 						return errors.Annotate(err, "put empty root ID to header")
 					}
