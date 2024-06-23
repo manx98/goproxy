@@ -49,7 +49,7 @@ func getHeader(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	var id []byte
-	if idStr == "" {
+	if idStr != "" {
 		id, err = base64.StdEncoding.DecodeString(idStr)
 		if err != nil {
 			logger.Debug("invalid id str", zap.String("id", idStr), zap.Error(err), requestIdLog)
@@ -60,10 +60,16 @@ func getHeader(w http.ResponseWriter, r *http.Request) {
 	var result []*obj.CheckPoint
 	err = db.View(func(tx *bbolt.Tx) error {
 		var first *obj.CheckPoint
-		if id == nil {
+		if len(id) == 0 {
 			first, err = export.GetHead(tx)
+			if err != nil {
+				return err
+			}
+			if first == nil {
+				return nil
+			}
 			result = append(result, first)
-			id = first.Id
+			id = first.Parent
 		}
 		for len(result) < num {
 			first, err = export.GetCheckPoint(tx, id)
