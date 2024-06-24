@@ -47,7 +47,7 @@ func (z *DiffZipper) writeFile(op OperateType, ctx context.Context, parent strin
 				return errors.Annotate(err1, "write zip file")
 			}
 			if err1 != nil {
-				if errors.Is(err, io.EOF) {
+				if errors.Is(err1, io.EOF) {
 					return nil
 				}
 				return errors.Annotate(err1, "read zip file")
@@ -111,7 +111,7 @@ func (z *DiffZipper) callback(ctx context.Context, op OperateType, parent string
 	if dirent.IsDir {
 		return z.writeDir(op, ctx, parent, dirent.Name)
 	} else {
-		return z.writeDir(op, ctx, parent, dirent.Name)
+		return z.writeFile(op, ctx, parent, dirent.Name)
 	}
 }
 

@@ -1,8 +1,10 @@
 <script setup>
-import {watch, reactive, ref, shallowRef} from "vue";
+import {watch, reactive, ref, shallowRef, onMounted, onUnmounted} from "vue";
 import {Fetch} from "~/utils";
 import qs from 'qs';
+import {ElMessage} from "element-plus";
 
+let version = shallowRef("");
 let downloading = shallowRef(false);
 let depName = shallowRef("");
 let msgList = reactive([]);
@@ -17,6 +19,10 @@ function convertToHtml(isErr, content) {
 }
 
 async function download() {
+  if(!depName.value){
+    ElMessage.error("请输入依赖名称");
+    return
+  }
   try {
     downloading.value = true;
     let response = await Fetch('/api/download_mod?' + qs.stringify({
@@ -50,6 +56,8 @@ async function download() {
       }
     }
     await response.run();
+    depName.value = "";
+    version.value = "";
   } catch (e) {
     msgList.push(convertToHtml(true, "发生异常: " + e))
   } finally {
@@ -64,6 +72,20 @@ watch(msgList, () => {
     msgBox.value.$el.scrollTop = msgBox.value.$el.scrollHeight;
   }, 0)
 })
+
+let terminalHeight = shallowRef('0px');
+
+function changeTerminalHeight() {
+  terminalHeight.value = window.innerHeight - 104 + 'px';
+}
+
+onMounted(changeTerminalHeight);
+
+addEventListener("resize", changeTerminalHeight);
+
+onUnmounted(() => {
+  removeEventListener("resize", changeTerminalHeight);
+});
 </script>
 
 <template>
@@ -79,7 +101,7 @@ watch(msgList, () => {
       </el-input>
     </el-col>
   </el-row>
-  <el-card style="background-color: #0a0a0a;height: 30vh;overflow-y: scroll" ref="msgBox">
+  <el-card :style="{'background-color': '#0a0a0a','height': terminalHeight, 'overflow-y': 'scroll'}" ref="msgBox">
     <p v-for="(item, index) in msgList" :key="index" v-html="item"></p>
   </el-card>
 </template>

@@ -354,7 +354,11 @@ func (g *Goproxy) serveSumDB(rw http.ResponseWriter, req *http.Request, target s
 		responseInternalServerError(rw, req)
 		return
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() {
+		if err = os.RemoveAll(tempDir); err != nil {
+			logger.Warn("failed to remove temporary directory", zap.String("tempDir", tempDir), zap.Error(err))
+		}
+	}()
 
 	file, err := httpGetTemp(req.Context(), g.httpClient, appendURL(u, path).String(), tempDir)
 	if err != nil {

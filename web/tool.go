@@ -77,7 +77,10 @@ func (g *GoTool) Get(w http.ResponseWriter, name string, version string) (err er
 	if err = command.Run(); err != nil {
 		return errors.Annotate(err, "failed to init mod get tmp dir")
 	}
-	command = exec.Command(g.GoBin, "get", "-x", name+"@"+version)
+	if version != "" {
+		name += "@" + version
+	}
+	command = exec.Command(g.GoBin, "get", "-x", name)
 	command.Dir = modDir
 	command.Stderr = stdErr
 	command.Stdout = stdOut

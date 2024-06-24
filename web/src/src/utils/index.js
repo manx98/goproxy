@@ -75,24 +75,28 @@ export class Fetcher {
     }
 
     async run() {
-        while (true) {
-            let t = await this.readByte();
-            switch (t) {
-                case DirAddUpdated:
-                    this.onDirAddUpdated(await this.readInt64());
-                    break;
-                case SizeAddUpdated:
-                    this.onSizeAddUpdated(await this.readInt64());
-                    break;
-                case StatusUpdated:
-                    this.onStatusUpdated(await this.readString());
-                    return;
-                case BinaryWrite:
-                    this.onBinaryWrite(await this.readBytes());
-                    break;
-                default:
-                    throw new Error(`Unknown type ${t}`);
+        try {
+            while (true) {
+                let t = await this.readByte();
+                switch (t) {
+                    case DirAddUpdated:
+                        await this.onDirAddUpdated(await this.readInt64());
+                        break;
+                    case SizeAddUpdated:
+                        await this.onSizeAddUpdated(await this.readInt64());
+                        break;
+                    case StatusUpdated:
+                        await this.onStatusUpdated(await this.readString());
+                        return;
+                    case BinaryWrite:
+                        await this.onBinaryWrite(await this.readBytes());
+                        break;
+                    default:
+                        throw new Error(`Unknown type ${t}`);
+                }
             }
+        } finally {
+            await this.reader.cancel()
         }
     }
 }
@@ -118,4 +122,25 @@ export function formatBytes(bytes, decimals = 2) {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
 
     return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + sizes[i];
+}
+
+export function formatTime(timestamp) {
+    const date = new Date(timestamp);
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0'); // 月份从0开始，需要加1
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${year}/${month}/${day} ${hours}:${minutes}`;
+}
+
+export function getDiffZipFileName() {
+    const date = new Date();
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0'); // 月份从0开始，需要加1
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${year}_${month}_${day}_${hours}_${minutes}_diff.zip`;
 }

@@ -5,6 +5,8 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"github.com/goproxy/goproxy/logger"
+	"go.uber.org/zap"
 	"io"
 	"io/fs"
 	"math"
@@ -112,10 +114,13 @@ func httpGetTemp(ctx context.Context, client *http.Client, url, tempDir string) 
 	}
 	defer func() {
 		if err != nil {
-			os.Remove(f.Name())
+			f.Close()
+			if err1 := os.Remove(f.Name()); err1 != nil {
+				logger.Warn("failed to remove temp file", zap.String("path", f.Name()), zap.Error(err1))
+			}
 		}
 	}()
-	if err := httpGet(ctx, client, url, f); err != nil {
+	if err = httpGet(ctx, client, url, f); err != nil {
 		return "", err
 	}
 	return f.Name(), f.Close()

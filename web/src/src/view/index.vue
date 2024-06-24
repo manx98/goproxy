@@ -1,5 +1,5 @@
 <template>
-  <el-row style="margin-top: 10px" :gutter="20">
+  <el-row style="margin-top: 10px">
     <el-col :span="12">
       <PackageDownload/>
     </el-col>

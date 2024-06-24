@@ -466,7 +466,9 @@ func (gf *GoFetcher) proxyDownload(ctx context.Context, path, version string, pr
 	}
 	defer func() {
 		if err != nil {
-			os.RemoveAll(tempDir)
+			if err1 := os.RemoveAll(tempDir); err1 != nil {
+				logger.Warn("failed to remove temp dir", zap.String("tempDir", tempDir), zap.Error(err1), zap.NamedError("occur_error", err))
+			}
 		}
 	}()
 
@@ -482,7 +484,11 @@ func (gf *GoFetcher) proxyDownload(ctx context.Context, path, version string, pr
 	if err != nil {
 		return
 	}
-	cleanup = func() { os.RemoveAll(tempDir) }
+	cleanup = func() {
+		if err1 := os.RemoveAll(tempDir); err1 != nil {
+			logger.Warn("failed to remove temp dir", zap.String("tempDir", tempDir), zap.Error(err1))
+		}
+	}
 	return
 }
 

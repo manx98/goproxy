@@ -92,30 +92,18 @@ func getHeader(w http.ResponseWriter, r *http.Request) {
 }
 
 func downloadDiff(w http.ResponseWriter, r *http.Request, g *goproxy.Goproxy) {
-	requestId, requestIdLog := nextRequestId()
+	_, requestIdLog := nextRequestId()
 	query := r.URL.Query()
 	idStr := query.Get("id")
 	logger.Debug("start download diff", zap.String("id", idStr), requestIdLog)
 	id := constant.EmptyId
 	st := export.NewCreateCheckPointWatcher(w)
 	err := db.View(func(tx *bbolt.Tx) (err error) {
-		if idStr == "" {
-			var head *obj.CheckPoint
-			head, err = export.GetHead(tx)
-			if head != nil {
-				id = head.Id
-			}
-			if err != nil {
-				logger.Warn("failed to get head", requestIdLog, zap.Error(err))
-				responseInternalError(requestId, w, "load last head")
-				return nil
-			}
-		} else {
+		if idStr != "" {
 			id, err = base64.StdEncoding.DecodeString(idStr)
 			if err != nil {
 				logger.Debug("invalid id str", zap.String("id", idStr), zap.Error(err), requestIdLog)
-				responseBadArgs(requestId, w)
-				return nil
+				return
 			}
 		}
 		zipper := export.NewDiffZipper(g.Cacher, w, st)
@@ -123,6 +111,7 @@ func downloadDiff(w http.ResponseWriter, r *http.Request, g *goproxy.Goproxy) {
 		return zipper.DiffHead(r.Context(), tx, id)
 	})
 	if err != nil {
+		logger.Debug("failed to download diff", requestIdLog, zap.Error(err))
 		if err1 := st.Close(err.Error()); err1 != nil {
 			logger.Warn("failed to finish download diff with error", requestIdLog, zap.NamedError("occur_error", err), zap.Error(err1))
 		}
