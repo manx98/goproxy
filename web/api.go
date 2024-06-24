@@ -12,7 +12,6 @@ import (
 	"go.etcd.io/bbolt"
 	"go.uber.org/zap"
 	"net/http"
-	"path/filepath"
 	"strconv"
 )
 
@@ -24,7 +23,7 @@ func initApi(mux *http.ServeMux, p *goproxy.Goproxy) {
 	mux.HandleFunc("/api/create_checkpoint", func(writer http.ResponseWriter, request *http.Request) {
 		createCheckpoint(writer, request, p)
 	})
-	tool := NewGoTool(p.GoBin, p.Address, filepath.Join(p.TempDir, "gopath"))
+	tool := NewGoTool(p.GoBin, p.Address, p.TempDir)
 	mux.HandleFunc("/api/download_mod", func(writer http.ResponseWriter, request *http.Request) {
 		downloadMod(writer, request, tool)
 	})
@@ -159,6 +158,8 @@ func createCheckpoint(w http.ResponseWriter, r *http.Request, g *goproxy.Goproxy
 }
 
 func downloadMod(w http.ResponseWriter, r *http.Request, f *GoTool) {
-	name := r.URL.Query().Get("q")
-	f.Get(w, name)
+	query := r.URL.Query()
+	name := query.Get("q")
+	version := query.Get("v")
+	f.Get(w, name, version)
 }

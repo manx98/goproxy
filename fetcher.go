@@ -7,6 +7,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/goproxy/goproxy/constant"
+	"github.com/goproxy/goproxy/logger"
+	"go.uber.org/zap"
 	"io"
 	"io/fs"
 	"net/http"
@@ -457,7 +460,7 @@ func (gf *GoFetcher) proxyDownload(ctx context.Context, path, version string, pr
 	}
 	urlWithoutExt := appendURL(proxy, escapedPath+"/@v/"+escapedVersion).String()
 
-	tempDir, err := os.MkdirTemp(gf.TempDir, tempDirPattern)
+	tempDir, err := os.MkdirTemp(gf.TempDir, constant.TempDirPattern)
 	if err != nil {
 		return
 	}
@@ -501,12 +504,15 @@ func (gf *GoFetcher) execGo(ctx context.Context, args ...string) ([]byte, error)
 		defer func() { <-gf.directFetchWorkerPool }()
 	}
 
-	tempDir, err := os.MkdirTemp(gf.TempDir, tempDirPattern)
+	tempDir, err := os.MkdirTemp(gf.TempDir, constant.TempDirPattern)
 	if err != nil {
 		return nil, err
 	}
-	defer os.RemoveAll(tempDir)
-
+	defer func() {
+		if err = os.RemoveAll(tempDir); err != nil {
+			logger.Warn("failed to remove temp dir", zap.Error(err), zap.String("path", tempDir))
+		}
+	}()
 	goBin := gf.GoBin
 	if goBin == "" {
 		goBin = "go"

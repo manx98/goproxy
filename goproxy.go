@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/goproxy/goproxy/cache"
+	"github.com/goproxy/goproxy/constant"
 	"github.com/goproxy/goproxy/db"
 	"github.com/goproxy/goproxy/logger"
 	"go.uber.org/zap"
@@ -22,9 +23,6 @@ import (
 
 	"golang.org/x/mod/module"
 )
-
-// tempDirPattern is the pattern for creating temporary directories.
-const tempDirPattern = "goproxy.tmp.*"
 
 // Goproxy is the top-level struct of this project.
 //
@@ -350,7 +348,7 @@ func (g *Goproxy) serveSumDB(rw http.ResponseWriter, req *http.Request, target s
 		g.serveCache(rw, req, target, contentType, cacheControlMaxAge, nil)
 		return
 	}
-	tempDir, err := os.MkdirTemp(g.TempDir, tempDirPattern)
+	tempDir, err := os.MkdirTemp(g.TempDir, constant.TempDirPattern)
 	if err != nil {
 		logger.Error("failed to create temporary directory", zap.Error(err))
 		responseInternalServerError(rw, req)

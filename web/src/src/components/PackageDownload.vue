@@ -10,9 +10,9 @@ let msgList = reactive([]);
 function convertToHtml(isErr, content) {
   content = content.replace("\\n", "<br>")
   if (isErr) {
-    return `<span style="color: red;font-size: 14px">${content}</span>`;
+    return `<span style="color: red;font-size: 10px">${content}</span>`;
   } else {
-    return `<span style="color: white;font-size: 14px">${content}</span>`;
+    return `<span style="color: white;font-size: 10px">${content}</span>`;
   }
 }
 
@@ -20,7 +20,8 @@ async function download() {
   try {
     downloading.value = true;
     let response = await Fetch('/api/download_mod?' + qs.stringify({
-      "q": depName.value
+      "q": depName.value,
+      "v": version.value,
     }), 'GET');
     msgList.length = 0;
     msgList.push(convertToHtml(false, '开始下载: ' + depName.value))
@@ -43,14 +44,14 @@ async function download() {
     }
     response.onStatusUpdated = (val) => {
       if (val) {
-        throw new Error('下载失败: ' + val)
+        throw new Error(val)
       } else {
         msgList.push(convertToHtml(false, "下载完成"))
       }
     }
     await response.run();
   } catch (e) {
-    msgList.push(convertToHtml(true, "下载失败: " + e))
+    msgList.push(convertToHtml(true, "发生异常: " + e))
   } finally {
     downloading.value = false;
   }
@@ -66,11 +67,18 @@ watch(msgList, () => {
 </script>
 
 <template>
-  <el-input :disabled="downloading" v-model="depName" placeholder="输入包名(golang.org/x/mod@v0.17.0)">
-    <template #append>
-      <el-button @click="download" :loading="downloading">{{ downloading ? "下载中" : "下载" }}</el-button>
-    </template>
-  </el-input>
+  <el-row :gutter="10">
+    <el-col :span="14">
+      <el-input :disabled="downloading" v-model="depName" placeholder="输入包名(golang.org/x/mod)"></el-input>
+    </el-col>
+    <el-col :span="10">
+      <el-input v-model="version" :disabled="downloading" placeholder="输入版本号(v0.17.0)">
+        <template #append>
+          <el-button @click="download" :loading="downloading">{{ downloading ? "下载中" : "下载" }}</el-button>
+        </template>
+      </el-input>
+    </el-col>
+  </el-row>
   <el-card style="background-color: #0a0a0a;height: 30vh;overflow-y: scroll" ref="msgBox">
     <p v-for="(item, index) in msgList" :key="index" v-html="item"></p>
   </el-card>

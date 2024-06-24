@@ -19,3 +19,9 @@ const (
 	Stderr = 'E'
 	Stdout = 'O'
 )
+
+const (
+	// TempDirPattern is the pattern for creating temporary directories.
+	TempDirPattern             = "goproxy.tmp.*"
+	TempDirModeDownloadPattern = "goproxy_mod_get.tmp.*"
+)
