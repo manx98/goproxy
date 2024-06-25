@@ -19,15 +19,15 @@
     <table>
       <tr>
         <td>目录数</td>
-        <td>{{ dirNum }}</td>
+        <td>{{ dirNum.Value }}</td>
       </tr>
       <tr>
         <td>文件数</td>
-        <td>{{ fileNum }}</td>
+        <td>{{ fileNum.Value }}</td>
       </tr>
       <tr>
         <td>大小</td>
-        <td>{{ formatBytes(fileSize) }}</td>
+        <td>{{ formatBytes(fileSize.Value.value) }}</td>
       </tr>
       <tr>
         <td>状态</td>
@@ -50,19 +50,20 @@
 
 <script setup>
 import tailSpin from '~/assets/icon/tail-spin.svg'
-import {Fetch, formatBytes} from '~/utils'
+import {DelayNumUpdater, Fetch, formatBytes} from '~/utils'
 import {computed, onMounted, onUnmounted, reactive, shallowRef, watch} from 'vue'
 import qs from 'qs'
 import {ElMessage} from "element-plus";
+import {DelayUpdateMs} from "~/config";
 
 let show = shallowRef(false);
 let desc = shallowRef("");
 let msg = shallowRef("");
 let occurErr = shallowRef(false);
 let running = shallowRef(false);
-let dirNum = shallowRef(0);
-let fileNum = shallowRef(0);
-let fileSize = shallowRef(0);
+let dirNum = new DelayNumUpdater(DelayUpdateMs);
+let fileNum = new DelayNumUpdater(DelayUpdateMs);
+let fileSize = new DelayNumUpdater(DelayUpdateMs);
 
 async function createCheckpoint() {
   try {
@@ -72,9 +73,9 @@ async function createCheckpoint() {
     }
     running.value = true;
     msg.value = "正在创建检查点..."
-    dirNum.value = 0;
-    fileNum.value = 0;
-    fileSize.value = 0;
+    dirNum.reset();
+    fileNum.reset();
+    fileSize.reset();
     occurErr.value = false;
     show.value = true;
     const response = await Fetch('/api/create_checkpoint?' + qs.stringify({
@@ -88,11 +89,11 @@ async function createCheckpoint() {
       }
     }
     response.onDirAddUpdated = (val) => {
-      dirNum.value += val;
+      dirNum.add(val);
     }
     response.onSizeAddUpdated = (val) => {
-      fileNum.value += 1;
-      fileSize.value += val;
+      fileNum.add(1);
+      fileSize.add(val);
     }
     response.onStatusUpdated = (val) => {
       if (val) {
@@ -107,6 +108,9 @@ async function createCheckpoint() {
     msg.value = "发生错误: " + error;
   } finally {
     running.value = false;
+    dirNum.flush();
+    fileNum.flush();
+    fileSize.flush();
   }
 }
 
@@ -152,7 +156,7 @@ async function loadHead() {
     }
   } catch (e) {
     noMore.value = true;
-    alert(e.toString())
+    ElMessage.error("加载历史出现错误: " + e);
   } finally {
     loading.value = false;
   }
@@ -173,6 +177,9 @@ addEventListener("resize", changeContainerBoxHeight);
 
 onUnmounted(() => {
   removeEventListener("resize", changeContainerBoxHeight);
+  dirNum.reset();
+  fileNum.reset();
+  fileSize.reset();
 });
 </script>
 

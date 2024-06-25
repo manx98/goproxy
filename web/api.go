@@ -27,6 +27,9 @@ func initApi(mux *http.ServeMux, p *goproxy.Goproxy) {
 	mux.HandleFunc("/api/download_mod", func(writer http.ResponseWriter, request *http.Request) {
 		downloadMod(writer, request, tool)
 	})
+	mux.HandleFunc("/api/apply_diff", func(writer http.ResponseWriter, request *http.Request) {
+		applyDiffFile(writer, request, p)
+	})
 }
 
 func getHeader(w http.ResponseWriter, r *http.Request) {

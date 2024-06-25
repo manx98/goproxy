@@ -1,10 +1,12 @@
 package utils
 
 import (
+	"fmt"
 	"github.com/juju/errors"
 	"io"
 	"io/fs"
 	"reflect"
+	"strings"
 )
 
 func CompareErrors(got, want error) bool {
@@ -40,4 +42,16 @@ func IsNil(i interface{}) bool {
 	}
 	vi := reflect.ValueOf(i)
 	return vi.Kind() == reflect.Ptr && vi.IsNil()
+}
+
+func GetBoundary(contentType string) (string, error) {
+	// Split the content type by ';'
+	parts := strings.Split(contentType, ";")
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if strings.HasPrefix(part, "boundary=") {
+			return strings.TrimPrefix(part, "boundary="), nil
+		}
+	}
+	return "", fmt.Errorf("no boundary found")
 }

@@ -39,6 +39,10 @@ func direntCompareFunc(a, b *obj.Dirent) int {
 	return strings.Compare(a.Name, b.Name)
 }
 
+func PutInt64(data []byte, num int64) {
+	binary.BigEndian.PutUint64(data, uint64(num))
+}
+
 type StreamDataWriter struct {
 	w         io.Writer
 	available bool
@@ -50,7 +54,7 @@ func (s *StreamDataWriter) AddDir(num int64) (err error) {
 		defer s.flush()
 		data := make([]byte, 9)
 		data[0] = DirAddUpdated
-		binary.BigEndian.PutUint64(data[1:], uint64(num))
+		PutInt64(data[1:], num)
 		_, err = s.w.Write(data)
 		if err != nil {
 			return errors.Annotate(err, "write dir num")
@@ -64,7 +68,7 @@ func (s *StreamDataWriter) AddSize(size int64) (err error) {
 		defer s.flush()
 		data := make([]byte, 9)
 		data[0] = SizeAddUpdated
-		binary.BigEndian.PutUint64(data[1:], uint64(size))
+		PutInt64(data[1:], size)
 		_, err = s.w.Write(data)
 		if err != nil {
 			return errors.Annotate(err, "write file size")
@@ -78,7 +82,7 @@ func (s *StreamDataWriter) Write(data []byte) (n int, err error) {
 		defer s.flush()
 		dataPackage := make([]byte, len(data)+9)
 		dataPackage[0] = BinaryWrite
-		binary.BigEndian.PutUint64(dataPackage[1:], uint64(len(data)))
+		PutInt64(dataPackage[1:], int64(len(data)))
 		copy(dataPackage[9:], data)
 		_, err = s.w.Write(dataPackage)
 		if err != nil {
@@ -93,7 +97,7 @@ func (s *StreamDataWriter) Close(msg string) (err error) {
 		defer s.flush()
 		data := make([]byte, len(msg)+9)
 		data[0] = StatusUpdated
-		binary.BigEndian.PutUint64(data[1:], uint64(len(msg)))
+		PutInt64(data[1:], int64(len(msg)))
 		copy(data[9:], msg)
 		_, err = s.w.Write(data)
 		if err != nil {

@@ -75,15 +75,7 @@ func (s3c *S3Cacher) Get(ctx context.Context, name string) (io.ReadCloser, error
 }
 
 // Put implements [github.com/goproxy/goproxy.Cacher].
-func (s3c *S3Cacher) Put(ctx context.Context, name string, content io.ReadSeeker) error {
-	size, err := content.Seek(0, io.SeekEnd)
-	if err != nil {
-		return err
-	}
-	if _, err := content.Seek(0, io.SeekStart); err != nil {
-		return err
-	}
-
+func (s3c *S3Cacher) Put(ctx context.Context, name string, size int64, content io.Reader) (err error) {
 	contentType := "application/octet-stream"
 	nameExt := filepath.Ext(name)
 	switch {

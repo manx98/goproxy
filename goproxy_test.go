@@ -736,7 +736,7 @@ func TestGoproxyServeFetchDownload(t *testing.T) {
 			n: 9,
 			cacher: &testCacher{
 				Cacher: cache.DirCacher(t.TempDir()),
-				put: func(ctx context.Context, c cache.Cacher, name string, content io.ReadSeeker) error {
+				put: func(ctx context.Context, c cache.Cacher, name string, size int64, content io.Reader) error {
 					return errors.New("cannot put")
 				},
 			},
@@ -749,8 +749,8 @@ func TestGoproxyServeFetchDownload(t *testing.T) {
 			n: 10,
 			cacher: &testCacher{
 				Cacher: cache.DirCacher(t.TempDir()),
-				put: func(ctx context.Context, c cache.Cacher, name string, content io.ReadSeeker) error {
-					if err := c.Put(ctx, name, content); err != nil {
+				put: func(ctx context.Context, c cache.Cacher, name string, size int64, content io.Reader) error {
+					if err := c.Put(ctx, name, size, content); err != nil {
 						return err
 					}
 					return content.(io.Closer).Close()
@@ -868,7 +868,7 @@ func TestGoproxyServeSumDB(t *testing.T) {
 			n: 6,
 			cacher: &testCacher{
 				Cacher: cache.DirCacher(t.TempDir()),
-				put: func(ctx context.Context, c cache.Cacher, name string, content io.ReadSeeker) error {
+				put: func(ctx context.Context, c cache.Cacher, name string, size int64, content io.Reader) error {
 					return errors.New("cannot put")
 				},
 			},
@@ -1270,7 +1270,7 @@ func makeZip(files map[string][]byte) ([]byte, error) {
 type testCacher struct {
 	cache.Cacher
 	get func(ctx context.Context, c cache.Cacher, name string) (io.ReadCloser, error)
-	put func(ctx context.Context, c cache.Cacher, name string, content io.ReadSeeker) error
+	put func(ctx context.Context, c cache.Cacher, name string, size int64, content io.Reader) error
 }
 
 func (c *testCacher) Get(ctx context.Context, name string) (io.ReadCloser, error) {
@@ -1280,9 +1280,9 @@ func (c *testCacher) Get(ctx context.Context, name string) (io.ReadCloser, error
 	return c.Cacher.Get(ctx, name)
 }
 
-func (c *testCacher) Put(ctx context.Context, name string, content io.ReadSeeker) error {
+func (c *testCacher) Put(ctx context.Context, name string, size int64, content io.Reader) error {
 	if c.put != nil {
-		return c.put(ctx, c.Cacher, name, content)
+		return c.put(ctx, c.Cacher, name, size, content)
 	}
-	return c.Cacher.Put(ctx, name, content)
+	return c.Cacher.Put(ctx, name, size, content)
 }

@@ -1,3 +1,6 @@
+import {shallowRef} from "vue";
+import exp from "constants";
+
 const DirAddUpdated = 68;
 const SizeAddUpdated = 83;
 const StatusUpdated = 77;
@@ -112,6 +115,14 @@ export async function Fetch(url, method = 'GET') {
     }
 }
 
+export async function WarpFetch(query) {
+    const response = await query;
+    if (response.ok) {
+        return new Fetcher(response.body.getReader());
+    } else {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+}
 export function formatBytes(bytes, decimals = 2) {
     if (bytes === undefined || bytes === 0) return '0B';
 
@@ -143,4 +154,39 @@ export function getDiffZipFileName() {
     const hours = String(date.getHours()).padStart(2, '0');
     const minutes = String(date.getMinutes()).padStart(2, '0');
     return `${year}_${month}_${day}_${hours}_${minutes}_diff.zip`;
+}
+
+export class DelayNumUpdater {
+    constructor(delay) {
+        this.delay = delay;
+        this.value_tmp = 0;
+        this.Value = shallowRef(0);
+        this.timer = undefined;
+    }
+
+    flush() {
+        clearTimeout(this.timer);
+        this.timer = undefined;
+        this.setValue(this.value_tmp)
+    }
+
+    setValue(value) {
+        this.Value.value = value;
+    }
+
+    add(value) {
+        this.value_tmp += value;
+        if (this.timer === undefined) {
+            this.timer = setTimeout(()=>{
+                this.flush();
+            }, this.delay);
+        }
+    }
+
+    reset() {
+        clearTimeout(this.timer);
+        this.value_tmp = 0;
+        this.timer = undefined;
+        this.setValue(0);
+    }
 }

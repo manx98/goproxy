@@ -32,7 +32,7 @@ type Cacher interface {
 	Get(ctx context.Context, name string) (io.ReadCloser, error)
 
 	// Put puts a cache for the name with the content.
-	Put(ctx context.Context, name string, content io.ReadSeeker) error
+	Put(ctx context.Context, name string, size int64, content io.Reader) error
 
 	List(ctx context.Context, name string) ([]*obj.Dirent, error)
 }
@@ -59,7 +59,7 @@ func (dc DirCacher) Get(ctx context.Context, name string) (io.ReadCloser, error)
 }
 
 // Put implements [Cacher].
-func (dc DirCacher) Put(ctx context.Context, name string, content io.ReadSeeker) error {
+func (dc DirCacher) Put(ctx context.Context, name string, size int64, content io.Reader) error {
 	file := filepath.Join(string(dc), filepath.FromSlash(name))
 	dir := filepath.Dir(file)
 	if err := os.MkdirAll(dir, 0o755); err != nil {

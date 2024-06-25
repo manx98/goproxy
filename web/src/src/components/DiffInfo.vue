@@ -1,9 +1,11 @@
 <script setup>
-import {shallowRef} from "vue";
-import {Fetch, formatBytes, formatTime, getDiffZipFileName} from '~/utils';
+import {onUnmounted, onUpdated, shallowRef} from "vue";
+import {DelayNumUpdater, Fetch, formatBytes, formatTime, getDiffZipFileName} from '~/utils';
 import StreamSaver from "streamsaver";
 import tailSpin from "~/assets/icon/tail-spin.svg";
 import qs from "qs";
+import {DelayUpdateMs} from "~/config";
+import DiffUploader from "~/components/DiffUploader.vue";
 
 defineProps({
   info: Object
@@ -13,15 +15,15 @@ let show = shallowRef(false);
 let msg = shallowRef("");
 let occurErr = shallowRef(false);
 let running = shallowRef(false);
-let dirNum = shallowRef(0);
-let fileSize = shallowRef(0);
+let dirNum = new DelayNumUpdater(DelayUpdateMs);
+let fileSize = new DelayNumUpdater(DelayUpdateMs);
 
 async function downloadDiff(id) {
   let fileStream = null;
   msg.value = "正在下载,请勿关闭页面";
   occurErr.value = false;
-  dirNum.value = 0;
-  fileSize.value = 0;
+  dirNum.reset();
+  fileSize.reset();
   running.value = true;
   show.value = true;
   try {
@@ -36,10 +38,10 @@ async function downloadDiff(id) {
       }
     };
     resp.onDirAddUpdated = (val) => {
-      dirNum.value += val;
+      dirNum.add(val);
     };
     resp.onSizeAddUpdated = (val) => {
-      fileSize.value += val;
+      fileSize.add(val);
     };
     await resp.run();
     await fileStream.close();
@@ -49,11 +51,22 @@ async function downloadDiff(id) {
       await fileStream.abort()
     }
     occurErr.value = true;
-    msg.value = "下载出错: " + e;
+    if(e) {
+      msg.value = "下载出错: " + e;
+    } else {
+      msg.value = "下载已被用户取消";
+    }
   } finally {
+    dirNum.flush();
+    fileSize.flush();
     running.value = false;
   }
 }
+
+onUnmounted(()=>{
+  dirNum.reset();
+  fileSize.reset();
+})
 </script>
 
 <template>
@@ -65,18 +78,18 @@ async function downloadDiff(id) {
     </el-space>
     <el-space v-else>
       <el-button @click="downloadDiff(info.id)">整库下载</el-button>
-      <el-upload>上传差异文件</el-upload>
+      <DiffUploader/>
     </el-space>
   </el-card>
   <el-dialog v-model="show" :show-close="!running" :close-on-click-modal="!running">
     <table>
       <tr>
         <td>已遍历(目录)</td>
-        <td>{{ dirNum }}</td>
+        <td>{{ dirNum.Value }}</td>
       </tr>
       <tr>
         <td>已压缩</td>
-        <td>{{ formatBytes(fileSize) }}</td>
+        <td>{{ formatBytes(fileSize.Value.value) }}</td>
       </tr>
       <tr>
         <td>状态</td>

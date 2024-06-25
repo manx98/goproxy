@@ -432,7 +432,14 @@ func (g *Goproxy) putCache(ctx context.Context, name string, content io.ReadSeek
 	if g.Cacher == nil {
 		return nil
 	}
-	return g.Cacher.Put(ctx, name, content)
+	size, err := content.Seek(0, io.SeekEnd)
+	if err != nil {
+		return err
+	}
+	if _, err := content.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+	return g.Cacher.Put(ctx, name, size, content)
 }
 
 // putCacheFile is like [putCache] but reads the content from the local file.
