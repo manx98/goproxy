@@ -59,6 +59,7 @@ func applyDiffFile(w http.ResponseWriter, r *http.Request, g *goproxy.Goproxy) (
 	watcher := &DiffApplyStatusSender{StreamDataWriter: export.NewCreateCheckPointWatcher(w)}
 	defer func() {
 		if err != nil {
+			logger.Warn("failed to apply diff", zap.Error(err))
 			if err1 := watcher.Close(err.Error()); err1 != nil {
 				logger.Warn("failed to finish apply diff with error", zap.NamedError("occur_error", err), zap.Error(err1))
 			}
@@ -68,6 +69,9 @@ func applyDiffFile(w http.ResponseWriter, r *http.Request, g *goproxy.Goproxy) (
 			}
 		}
 	}()
+	if err = os.MkdirAll(g.TempDir, 0o755); err != nil {
+		return errors.Annotate(err, "create temp dir")
+	}
 	var boundary string
 	boundary, err = utils.GetBoundary(r.Header.Get("Content-Type"))
 	if err != nil {
