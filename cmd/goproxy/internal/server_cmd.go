@@ -147,6 +147,15 @@ func runServerCmd(cmd *cobra.Command, args []string, cfg *serverCmdConfig) error
 	if cfg.pathPrefix != "" {
 		proxyPrefix = cfg.pathPrefix
 		handler = http.StripPrefix(cfg.pathPrefix, handler)
+		mux.HandleFunc("/", web.IndexHandler)
+	} else {
+		handler = http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			if request.URL.Path == "/" {
+				web.IndexHandler(writer, request)
+			} else {
+				g.ServeHTTP(writer, request)
+			}
+		})
 	}
 	if cfg.fetchTimeout > 0 {
 		handler = func(h http.Handler) http.Handler {

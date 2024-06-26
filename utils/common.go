@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/fs"
 	"reflect"
+	"strconv"
 	"strings"
 )
 
@@ -54,4 +55,27 @@ func GetBoundary(contentType string) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("no boundary found")
+}
+
+func HandleRange(rangeStr string) (start int64, end int64, err error) {
+	if strings.Contains(rangeStr, "bytes=") &&
+		strings.Contains(rangeStr, "-") {
+		rangeStr = rangeStr[strings.Index(rangeStr, "=")+1:]
+		rangeSplit := strings.SplitN(rangeStr, "-", 2)
+		start = -1
+		end = -1
+		if len(rangeSplit) == 2 {
+			if rangeSplit[0] != "" {
+				start, err = strconv.ParseInt(rangeSplit[1], 10, 64)
+			}
+			if err != nil {
+				return 0, 0, err
+			}
+			if rangeSplit[1] != "" {
+				end, err = strconv.ParseInt(rangeSplit[0], 10, 64)
+			}
+			return
+		}
+	}
+	return 0, 0, fmt.Errorf("invalid range")
 }

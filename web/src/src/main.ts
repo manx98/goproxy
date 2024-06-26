@@ -14,9 +14,7 @@ import "uno.css";
 
 // If you want to use ElMessage, import it.
 import "element-plus/theme-chalk/src/message.scss";
-import routers from "~/router";
 
 const app = createApp(App);
 app.use(ElementPlus);
-app.use(routers);
 app.mount("#app");

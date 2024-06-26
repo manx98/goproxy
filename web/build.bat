@@ -30,7 +30,7 @@ IF %ERRORLEVEL% NEQ 0 (
 set DIST_OUT_DIR=../dist
 
 echo 编译项目
-call pnpm run build
+call pnpm run build --emptyOutDir
 IF %ERRORLEVEL% NEQ 0 (
     echo Failed to build the project
     exit /b %ERRORLEVEL%
