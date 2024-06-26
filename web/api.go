@@ -126,6 +126,8 @@ func downloadDiff(w http.ResponseWriter, r *http.Request, g *goproxy.Goproxy) {
 }
 
 func createCheckpoint(w http.ResponseWriter, r *http.Request, g *goproxy.Goproxy) {
+	db.Lock.Lock()
+	defer db.Lock.Unlock()
 	st := export.NewCreateCheckPointWatcher(w)
 	var id []byte
 	err := db.Update(func(tx *bbolt.Tx) (err error) {

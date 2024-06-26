@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"github.com/goproxy/goproxy"
 	"github.com/goproxy/goproxy/constant"
+	"github.com/goproxy/goproxy/db"
 	"github.com/goproxy/goproxy/export"
 	"github.com/goproxy/goproxy/logger"
 	"github.com/goproxy/goproxy/utils"
@@ -53,6 +54,8 @@ type DiffApplyInfo struct {
 }
 
 func applyDiffFile(w http.ResponseWriter, r *http.Request, g *goproxy.Goproxy) (err error) {
+	db.Lock.Lock()
+	defer db.Lock.Unlock()
 	watcher := &DiffApplyStatusSender{StreamDataWriter: export.NewCreateCheckPointWatcher(w)}
 	defer func() {
 		if err != nil {
@@ -77,10 +80,8 @@ func applyDiffFile(w http.ResponseWriter, r *http.Request, g *goproxy.Goproxy) (
 		return errors.Annotate(err, "create temp dir")
 	}
 	defer func() {
-		if err != nil {
-			if err1 := os.RemoveAll(tempDir); err1 != nil {
-				logger.Warn("failed to remove temp dir", zap.String("temp_dir", tempDir), zap.Error(err1))
-			}
+		if err1 := os.RemoveAll(tempDir); err1 != nil {
+			logger.Warn("failed to remove temp dir", zap.String("temp_dir", tempDir), zap.Error(err1))
 		}
 	}()
 	var tempFile *os.File
@@ -89,10 +90,8 @@ func applyDiffFile(w http.ResponseWriter, r *http.Request, g *goproxy.Goproxy) (
 		return errors.Annotate(err, "create temp file")
 	}
 	defer func() {
-		if err != nil {
-			if err1 := tempFile.Close(); err1 != nil {
-				logger.Warn("failed to close temp file", zap.String("temp_file", tempFile.Name()), zap.Error(err1))
-			}
+		if err1 := tempFile.Close(); err1 != nil {
+			logger.Warn("failed to close temp file", zap.String("temp_file", tempFile.Name()), zap.Error(err1))
 		}
 	}()
 	var fileSize int64
