@@ -62,6 +62,7 @@ type serverCmdConfig struct {
 	fetchTimeout     time.Duration
 	shutdownTimeout  time.Duration
 	noFetch          bool
+	cacheFist        bool
 }
 
 // newServerCmdConfig creates a new [serverCmdConfig].
@@ -87,6 +88,7 @@ func newServerCmdConfig(cmd *cobra.Command) *serverCmdConfig {
 	fs.StringVar(&cfg.dataDir, "data-dir", "data-dir", "directory for storing temporary files and databases file")
 	fs.BoolVar(&cfg.insecure, "insecure", false, "allow insecure TLS connections")
 	fs.BoolVar(&cfg.noFetch, "no-fetch", false, "only use local cache.")
+	fs.BoolVar(&cfg.cacheFist, "cache-first", false, "use local cache first.")
 	fs.DurationVar(&cfg.connectTimeout, "connect-timeout", 30*time.Second, "maximum amount of time (0 means no limit) will wait for an outgoing connection to establish")
 	fs.DurationVar(&cfg.fetchTimeout, "fetch-timeout", 10*time.Minute, "maximum amount of time (0 means no limit) will wait for a fetch to complete")
 	fs.DurationVar(&cfg.shutdownTimeout, "shutdown-timeout", 10*time.Second, "maximum amount of time (0 means no limit) will wait for the server to shutdown")
@@ -115,6 +117,7 @@ func runServerCmd(cmd *cobra.Command, args []string, cfg *serverCmdConfig) error
 		TempDir:       tmpDir,
 		Transport:     transport,
 		NoFetch:       cfg.noFetch,
+		CacheFirst:    cfg.cacheFist,
 	}
 	if cfg.goBin == "" {
 		g.GoBin = "go"

@@ -19,7 +19,7 @@ export DIST_OUT_DIR=../dist || {
   exit 1
 }
 echo "Building ..."
-pnpm build || {
+pnpm build --emptyOutDir || {
   echo "Error: Could not build"
   exit 1
 }

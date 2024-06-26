@@ -150,8 +150,5 @@ func createCheckpoint(w http.ResponseWriter, r *http.Request, g *goproxy.Goproxy
 }
 
 func downloadMod(w http.ResponseWriter, r *http.Request, f *GoTool) {
-	query := r.URL.Query()
-	name := query.Get("q")
-	version := query.Get("v")
-	f.Get(w, name, version)
+	f.Get(w, r.Body)
 }

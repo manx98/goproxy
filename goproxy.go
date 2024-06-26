@@ -74,6 +74,7 @@ type Goproxy struct {
 	proxiedSumDBs map[string]*url.URL
 	httpClient    *http.Client
 	GoBin         string
+	CacheFirst    bool
 }
 
 // init initializes the g.
@@ -202,6 +203,18 @@ func (g *Goproxy) serveFetchQuery(rw http.ResponseWriter, req *http.Request, tar
 		g.serveCache(rw, req, target, contentType, cacheControlMaxAge, nil)
 		return
 	}
+	if g.CacheFirst {
+		g.serveCache(rw, req, target, contentType, cacheControlMaxAge, func() {
+			version, time, err := g.fetcher.Query(req.Context(), modulePath, moduleQuery)
+			if err != nil {
+				logger.Error("failed to query module version", zap.String("target", target), zap.Error(err))
+				responseError(rw, req, err, true)
+				return
+			}
+			g.servePutCache(rw, req, target, contentType, cacheControlMaxAge, strings.NewReader(marshalInfo(version, time)))
+		})
+		return
+	}
 	version, time, err := g.fetcher.Query(req.Context(), modulePath, moduleQuery)
 	if err != nil {
 		g.serveCache(rw, req, target, contentType, cacheControlMaxAge, func() {
@@ -221,6 +234,18 @@ func (g *Goproxy) serveFetchList(rw http.ResponseWriter, req *http.Request, targ
 	)
 	if g.NoFetch {
 		g.serveCache(rw, req, target, contentType, cacheControlMaxAge, nil)
+		return
+	}
+	if g.CacheFirst {
+		g.serveCache(rw, req, target, contentType, cacheControlMaxAge, func() {
+			versions, err := g.fetcher.List(req.Context(), modulePath)
+			if err != nil {
+				logger.Error("failed to list module versions", zap.String("target", target), zap.Error(err))
+				responseError(rw, req, err, true)
+				return
+			}
+			g.servePutCache(rw, req, target, contentType, cacheControlMaxAge, strings.NewReader(strings.Join(versions, "\n")))
+		})
 		return
 	}
 	versions, err := g.fetcher.List(req.Context(), modulePath)

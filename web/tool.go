@@ -6,6 +6,8 @@ import (
 	"github.com/goproxy/goproxy/logger"
 	"github.com/juju/errors"
 	"go.uber.org/zap"
+	"golang.org/x/mod/modfile"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -25,7 +27,7 @@ type GoTool struct {
 	TmpPath string
 }
 
-func (g *GoTool) Get(w http.ResponseWriter, name string, version string) (err error) {
+func (g *GoTool) Get(w http.ResponseWriter, modFile io.Reader) (err error) {
 	st := export.NewCreateCheckPointWatcher(w)
 	stdErr := WriterFunc(func(p []byte) (n int, err error) {
 		defer func() {
@@ -41,6 +43,7 @@ func (g *GoTool) Get(w http.ResponseWriter, name string, version string) (err er
 	})
 	defer func() {
 		if err != nil {
+			logger.Warn("failed to send close with error", zap.NamedError("occur_error", err))
 			if err1 := st.Close(err.Error()); err1 != nil {
 				logger.Warn("failed to send close with error", zap.NamedError("occur_error", err), zap.Error(err))
 			}
@@ -50,7 +53,30 @@ func (g *GoTool) Get(w http.ResponseWriter, name string, version string) (err er
 			}
 		}
 	}()
+	modData, err := io.ReadAll(modFile)
+	if err != nil {
+		return errors.Annotate(err, "failed to read mod file")
+	}
+	modStruct, err := modfile.Parse("go.mod", modData, nil)
+	if err != nil {
+		return errors.Annotate(err, "failed to parse mod file")
+	}
+	mainGo := strings.Builder{}
+	mainGo.WriteString("package main\n\nimport (\n")
+	for _, req := range modStruct.Require {
+		if req.Indirect {
+			continue
+		}
+		mainGo.WriteString("\t_ \"")
+		mainGo.WriteString(req.Mod.Path)
+		mainGo.WriteString("\"\n")
+	}
+	mainGo.WriteString("\n)\nfunc main() {}")
 	var tempDir string
+	err = os.MkdirAll(g.TmpPath, 0o755)
+	if err != nil {
+		return errors.Annotate(err, "failed to create mod get tmp dir")
+	}
 	tempDir, err = os.MkdirTemp(g.TmpPath, constant.TempDirModeDownloadPattern)
 	if err != nil {
 		return errors.Annotate(err, "failed to create mod get tmp dir")
@@ -68,19 +94,14 @@ func (g *GoTool) Get(w http.ResponseWriter, name string, version string) (err er
 	if err = os.Mkdir(modDir, 0755); err != nil {
 		return errors.Annotate(err, "failed to create mod get tmp dir")
 	}
+	if err = os.WriteFile(filepath.Join(modDir, "main.go"), []byte(mainGo.String()), 0644); err != nil {
+		return errors.Annotate(err, "failed to write main.go")
+	}
+	if err = os.WriteFile(filepath.Join(modDir, "go.mod"), modData, 0644); err != nil {
+		return errors.Annotate(err, "failed to write go.mod")
+	}
 	env := append([]string{"GOPATH=" + goPath}, g.Env...)
-	command := exec.Command(g.GoBin, "mod", "init", "go_get")
-	command.Env = env
-	command.Dir = modDir
-	command.Stderr = stdErr
-	command.Stdout = stdOut
-	if err = command.Run(); err != nil {
-		return errors.Annotate(err, "failed to init mod get tmp dir")
-	}
-	if version != "" {
-		name += "@" + version
-	}
-	command = exec.Command(g.GoBin, "get", "-x", name)
+	command := exec.Command(g.GoBin, "mod", "tidy", "-x")
 	command.Dir = modDir
 	command.Stderr = stdErr
 	command.Stdout = stdOut
@@ -105,15 +126,15 @@ func NewGoTool(goBin string, goProxy string, tmpDir string) *GoTool {
 	goProxy = "GOPROXY=" + goProxy + ",direct"
 	goSumDb := "GOSUMDB=off"
 	for _, value := range environ {
-		value = strings.ToUpper(value)
-		if strings.HasPrefix(value, "GOPROXY=") {
+		upValue := strings.ToUpper(value)
+		if strings.HasPrefix(upValue, "GOPROXY=") {
 			foundGoProxy = true
 			t.Env = append(t.Env, goProxy)
-		} else if strings.HasPrefix(value, "GOSUMDB=") {
+		} else if strings.HasPrefix(upValue, "GOSUMDB=") {
 			t.Env = append(t.Env, goSumDb)
 			foundGoSumDb = true
-		} else if !strings.HasPrefix(value, "GOPATH=") {
-
+		} else if !strings.HasPrefix(upValue, "GOPATH=") {
+			t.Env = append(t.Env, value)
 		}
 	}
 	if !foundGoProxy {
