@@ -3,12 +3,12 @@ package internal
 import (
 	"context"
 	"crypto/tls"
-	"errors"
 	"fmt"
 	"github.com/goproxy/goproxy/cache"
 	"github.com/goproxy/goproxy/constant"
 	"github.com/goproxy/goproxy/db"
 	"github.com/goproxy/goproxy/web"
+	"github.com/juju/errors"
 	"net"
 	"net/http"
 	"os"
@@ -97,8 +97,9 @@ func newServerCmdConfig(cmd *cobra.Command) *serverCmdConfig {
 
 // runServerCmd runs the server command.
 func runServerCmd(cmd *cobra.Command, args []string, cfg *serverCmdConfig) error {
-	if err := os.MkdirAll(cfg.dataDir, 0755); err != nil {
-		return fmt.Errorf("failed to create data dir: %w", err)
+	err := os.MkdirAll(cfg.dataDir, 0755)
+	if err != nil {
+		return errors.Annotate(err, "create data dir")
 	}
 	db.InitDb(filepath.Join(cfg.dataDir, constant.DbFileName))
 	transport := http.DefaultTransport.(*http.Transport).Clone()
@@ -106,6 +107,10 @@ func runServerCmd(cmd *cobra.Command, args []string, cfg *serverCmdConfig) error
 	transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: cfg.insecure}
 	transport.RegisterProtocol("file", http.NewFileTransport(httpDirFS{}))
 	tmpDir := filepath.Join(cfg.dataDir, constant.CacheDir)
+	tmpDir, err = filepath.Abs(tmpDir)
+	if err != nil {
+		return errors.Annotate(err, "create tmp dir")
+	}
 	g := &goproxy.Goproxy{
 		Fetcher: &goproxy.GoFetcher{
 			GoBin:            cfg.goBin,

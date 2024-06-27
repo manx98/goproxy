@@ -61,17 +61,6 @@ func (g *GoTool) Get(w http.ResponseWriter, modFile io.Reader) (err error) {
 	if err != nil {
 		return errors.Annotate(err, "failed to parse mod file")
 	}
-	mainGo := strings.Builder{}
-	mainGo.WriteString("package main\n\nimport (\n")
-	for _, req := range modStruct.Require {
-		if req.Indirect {
-			continue
-		}
-		mainGo.WriteString("\t_ \"")
-		mainGo.WriteString(req.Mod.Path)
-		mainGo.WriteString("\"\n")
-	}
-	mainGo.WriteString("\n)\nfunc main() {}")
 	var tempDir string
 	err = os.MkdirAll(g.TmpPath, 0o755)
 	if err != nil {
@@ -94,20 +83,27 @@ func (g *GoTool) Get(w http.ResponseWriter, modFile io.Reader) (err error) {
 	if err = os.Mkdir(modDir, 0755); err != nil {
 		return errors.Annotate(err, "failed to create mod get tmp dir")
 	}
-	if err = os.WriteFile(filepath.Join(modDir, "main.go"), []byte(mainGo.String()), 0644); err != nil {
-		return errors.Annotate(err, "failed to write main.go")
-	}
-	if err = os.WriteFile(filepath.Join(modDir, "go.mod"), modData, 0644); err != nil {
-		return errors.Annotate(err, "failed to write go.mod")
-	}
 	env := append([]string{"GOPATH=" + goPath}, g.Env...)
-	command := exec.Command(g.GoBin, "mod", "tidy", "-x")
+	command := exec.Command(g.GoBin, "mod", "init", "mod_get")
 	command.Dir = modDir
 	command.Stderr = stdErr
 	command.Stdout = stdOut
 	command.Env = env
 	if err = command.Run(); err != nil {
-		return errors.Annotate(err, "failed to download mod")
+		return errors.Annotate(err, "failed to init mod")
+	}
+	for _, req := range modStruct.Require {
+		if req.Indirect {
+			continue
+		}
+		command = exec.Command(g.GoBin, "get", "-x", req.Mod.String())
+		command.Dir = modDir
+		command.Stderr = stdErr
+		command.Stdout = stdOut
+		command.Env = env
+		if err = command.Run(); err != nil {
+			return errors.Annotate(err, "failed to download mod")
+		}
 	}
 	return
 }
