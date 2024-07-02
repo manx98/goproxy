@@ -90,20 +90,25 @@ func (g *GoTool) Get(w http.ResponseWriter, modFile io.Reader) (err error) {
 	command.Stdout = stdOut
 	command.Env = env
 	if err = command.Run(); err != nil {
-		return errors.Annotate(err, "failed to init mod")
+		return errors.Annotate(err, "init mod")
 	}
 	for _, req := range modStruct.Require {
-		if req.Indirect {
-			continue
-		}
 		command = exec.Command(g.GoBin, "get", "-x", req.Mod.String())
 		command.Dir = modDir
 		command.Stderr = stdErr
 		command.Stdout = stdOut
 		command.Env = env
 		if err = command.Run(); err != nil {
-			return errors.Annotate(err, "failed to download mod")
+			return errors.Annotate(err, "download mod")
 		}
+	}
+	command = exec.Command(g.GoBin, "list", "-mod=readonly", "-x", "-m", "-u", "all")
+	command.Dir = modDir
+	command.Stderr = stdErr
+	command.Stdout = stdOut
+	command.Env = env
+	if err = command.Run(); err != nil {
+		return errors.Annotate(err, "get upgrade mod info")
 	}
 	return
 }
